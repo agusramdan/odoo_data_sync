@@ -11,10 +11,8 @@
 <!--                        <field name="internal_model" icon="fa-home" enable_counters="1"/>-->
 <!--                    </searchpanel>-->
 <!--                    <separator/>-->
-<!--                    <filter name="filter_progress" string="Progres" domain="[('state', '=', 'progress')]"/>-->
-<!--                    <filter name="filter_done" string="Done" domain="[('state', '=', 'done')]"/>-->
 <!--                    <separator/>-->
-<!--                    <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>-->
+                    <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
                     <group expand="0" string="Group By">
                         <filter name="group_external_model" string="Model" domain="[]" context="{'group_by': 'external_model'}"/>
                         <filter name="group_application_name" string="Application Name" domain="[]" context="{'group_by': 'external_app_name'}"/>
@@ -50,13 +48,17 @@
                                 <group>
                                     <group>
                                         <field name="sync_cron" />
+                                        <field name="external_sync" />
                                         <field name="strategy" />
-                                        <field name="external_domain"/>
-                                        <field name="external_context"/>
                                     </group>
                                     <group>
+                                        <field name="external_domain"/>
+                                        <field name="external_context"/>
+
                                         <field name="internal_lookup_fields" />
                                         <field name="internal_lookup_method" />
+
+                                        <field name="internal_call_method" />
                                     </group>
                                 </group>
                             </page>

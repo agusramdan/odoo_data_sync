@@ -11,6 +11,7 @@
 <!--                        <field name="sync_strategy_id" icon="fa-home" enable_counters="1"/>-->
 <!--                    </searchpanel>-->
 <!--                    <separator/>-->
+                    <filter name="filter_draft" string="Draft" domain="[('state', '=', 'draft')]"/>
                     <filter name="filter_need_resolve" string="Need Resolve" domain="[('state', '=', 'need_resolve')]"/>
                     <filter name="filter_error" string="Error" domain="[('state', '=', 'error')]"/>
                     <filter name="filter_progress" string="Progres" domain="[('state', '=', 'progress')]"/>

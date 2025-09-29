@@ -20,7 +20,11 @@ class ExternalDataSync(models.Model):
     
     Model ini juga bisa di jadikan mapping bila mendapatakan data dari external untuk refeensi object.
     """
-
+    active = fields.Boolean(
+        string='Active',
+        default=True,
+        help="If unchecked, it will allow you to hide the record without removing it."
+    )
     state = fields.Selection(
         [('draft', 'Draft'), ('process', 'Process'), ('need_resolve', 'Need Resolve'), ('error', 'Error'),
          ('done', 'Done'), ]

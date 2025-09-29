@@ -21,7 +21,11 @@ class ExternalDataSync(models.Model):
     _description = """
     Model strategy bagaimana objec di syncronkan dari server external
     """
-
+    active = fields.Boolean(
+        string='Active',
+        default=True,
+        help="If unchecked, it will allow you to hide the record without removing it."
+    )
     external_model = fields.Char()
     external_app_name = fields.Char()
     external_domain = fields.Char()
@@ -79,6 +83,9 @@ class ExternalDataSync(models.Model):
     internal_prepare_method = fields.Char()
     internal_context = fields.Char()
     internal_process_method = fields.Char(
+        help="Method ini di panggil setelah data di proses dari external dan sebelum di simpan ke internal"
+    )
+    internal_call_method = fields.Char(
         help="Method ini di panggil setelah data di proses dari external dan sebelum di simpan ke internal"
     )
 
