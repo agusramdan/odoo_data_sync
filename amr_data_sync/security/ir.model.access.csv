@@ -1,0 +1,24 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_external_data_sync_user,external.data.sync User,model_external_data_sync,base.group_user,1,1,1,0
+access_external_data_sync_admin,external.data.sync Admin,model_external_data_sync,base.group_erp_manager,1,1,1,1
+
+access_external_server_sync_user,external.server.sync User,model_external_server_sync,base.group_user,1,0,0,0
+access_external_server_sync_admin,external.server.sync Admin,model_external_server_sync,base.group_erp_manager,1,1,1,1
+
+access_external_data_sync_strategy_user,external.data.sync.strategy User,model_external_data_sync_strategy,base.group_user,1,0,0,0
+access_external_data_sync_strategy_admin,external.data.sync.strategy Admin,model_external_data_sync_strategy,base.group_erp_manager,1,1,1,1
+
+access_external_data_mapping_user,external.data.mapping User,model_external_data_mapping,base.group_user,1,0,0,0
+access_external_data_mapping_admin,external.data.mapping Admin,model_external_data_mapping,base.group_erp_manager,1,1,1,1
+
+access_external_data_lookup_user,external.data.lookup User,model_external_data_lookup,base.group_user,1,0,0,0
+access_external_data_lookup_admin,external.data.lookup Admin,model_external_data_lookup,base.group_erp_manager,1,1,1,1
+
+access_external_data_sync_exclude_user,external.data.sync_exclude User,model_external_data_sync_exclude,base.group_user,1,0,0,0
+access_external_data_sync_exclude_admin,external.data.sync_exclude Admin,model_external_data_sync_exclude,base.group_erp_manager,1,1,1,1
+
+access_external_data_sync_related_user,external.data.sync.related User,model_external_data_sync_related,base.group_user,1,1,1,0
+access_external_data_sync_related_admin,external.data.sync.related Admin,model_external_data_sync_related,base.group_erp_manager,1,1,1,1
+
+access_sync_access_token_user,access_sync_access_token,model_sync_access_token,base.group_user,1,0,0,0
+access_sync_access_token_admin,access_sync_access_token,model_sync_access_token,base.group_erp_manager,1,1,1,1

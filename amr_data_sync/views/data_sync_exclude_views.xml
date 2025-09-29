@@ -1,0 +1,26 @@
+<odoo>
+    <data>
+        <record id="external_data_sync_exclude_tree" model="ir.ui.view">
+            <field name="name">external.data.sync.exclude.tree</field>
+            <field name="model">external.data.sync.exclude</field>
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <tree create="1" edit="1">
+                    <field name="active" invisible="1"/>
+                    <field name="exclude"/>
+                    <field name="model"/>
+                    <field name="fields"/>
+                </tree>
+            </field>
+        </record>
+
+        <record model="ir.actions.act_window" id="external_data_sync_exclude_action">
+            <field name="name">External Data Sync Exclude</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">external.data.sync.exclude</field>
+            <field name="view_mode">tree</field>
+            <field name="domain">[]</field>
+        </record>
+
+    </data>
+</odoo>

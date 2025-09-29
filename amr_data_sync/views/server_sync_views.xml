@@ -1,0 +1,62 @@
+<odoo>
+    <data>
+        <record id="external_server_sync_form" model="ir.ui.view">
+            <field name="name">external.server.sync.form</field>
+            <field name="model">external.server.sync</field>
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <form string="sync">
+                    <header>
+                        <button name="action_get_db_name" type="object" string="Get DB Name" class="oe_highlight"  />
+                        <button name="jsonrpc_authenticate" type="object" string="Authenticate" class="oe_highlight"  />
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="app_name"/>
+                                <field name="base_url"/>
+                                <field name="path"/>
+                            </group>
+                            <group>
+                                <field name="odoo_server_db"/>
+                                <field name="odoo_server_uid"/>
+                            </group>
+                            <group>
+                                <field name="auth_type"/>
+                                <field name="basic_auth_username" attrs="{'invisible':[('auth_type','!=','basic')]}"/>
+                                <field name="basic_auth_password" attrs="{'invisible':[('auth_type','!=','basic')]}"/>
+
+                                <field name="token_in" attrs="{'invisible':[('auth_type','!=','token')]}"/>
+                                <field name="token_key" attrs="{'invisible':[('auth_type','!=','token')]}"/>
+                                <field name="token_value" attrs="{'invisible':[('auth_type','!=','token')]}"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="external_server_sync_tree" model="ir.ui.view">
+            <field name="name">external.server.sync.tree</field>
+            <field name="model">external.server.sync</field>
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <tree >
+                    <field name="name"/>
+                    <field name="base_url"/>
+                    <field name="odoo_server_db"/>
+                    <field name="auth_type"/>
+                </tree>
+            </field>
+        </record>
+
+        <record model="ir.actions.act_window" id="external_server_sync_action">
+            <field name="name">External Server Sync</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">external.server.sync</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[]</field>
+        </record>
+    </data>
+</odoo>

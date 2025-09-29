@@ -1,0 +1,72 @@
+<odoo>
+    <data>
+
+        <record id="external_data_lookup_filter" model="ir.ui.view">
+            <field name="name">external.data.lookup.search</field>
+            <field name="model">external.data.lookup</field>
+            <field name="arch" type="xml">
+                <search string="External Data">
+                    <field name="name"/>
+                    <group expand="0" string="Group By">
+                        <filter name="group_model_internal" string="Internal Model" domain="[]" context="{'group_by': 'internal_model'}"/>
+                        <filter name="group_application_name" string="Application Name" domain="[]" context="{'group_by': 'external_app_name'}"/>
+                        <filter name="group_model_external" string="Internal Model" domain="[]" context="{'group_by': 'external_model'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="external_data_lookup_form" model="ir.ui.view">
+            <field name="name">external.data.lookup.form</field>
+            <field name="model">external.data.lookup</field>
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <form string="sync">
+                    <header>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="external_model"/>
+                                <field name="external_app_name"/>
+                            </group>
+                            <group>
+                                <field name="internal_model"/>
+                                <field name="internal_id"/>
+                            </group>
+                        </group>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="external_data_lookup_tree" model="ir.ui.view">
+            <field name="name">external.data.lookup.tree</field>
+            <field name="model">external.data.lookup</field>
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <tree>
+                    <field name="active" invisible="1"/>
+                    <field name="name"/>
+                    <field name="external_model"/>
+                    <field name="external_app_name"/>
+                    <field name="internal_model"/>
+                    <button name="action_open_internal" type="object"
+                            string="Open Internal Data" class="oe_highlight" />
+                </tree>
+            </field>
+        </record>
+
+        <record model="ir.actions.act_window" id="external_data_lookup_action">
+            <field name="name">External Data Lookup </field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">external.data.lookup</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[]</field>
+            <field name="context">{'update': False}</field>
+        </record>
+
+
+    </data>
+</odoo>
