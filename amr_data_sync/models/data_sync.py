@@ -20,7 +20,11 @@ class ExternalDataSync(models.Model):
     
     Model ini juga bisa di jadikan mapping bila mendapatakan data dari external untuk refeensi object.
     """
-
+    active = fields.Boolean(
+        string='Active',
+        default=True,
+        help="If unchecked, it will allow you to hide the record without removing it."
+    )
     state = fields.Selection(
         [('draft', 'Draft'), ('process', 'Process'), ('need_resolve', 'Need Resolve'), ('error', 'Error'),
          ('done', 'Done'), ]
@@ -110,13 +114,16 @@ class ExternalDataSync(models.Model):
 
     def get_json_data_for_create(self):
         json_date = json.loads(self.data_json)
-        if not isinstance(json_date, dict):
-            json_data = self.get_external_one_data()
-            self.data_json = json.dumps(json_data)
+        if isinstance(json_date, dict):
+            return json_date
+
+        json_data = self.get_external_one_data()
+        self.data_json = json.dumps(json_data)
         return json_data
 
     def action_reset_related(self):
-        self.related_ids = False
+        for rec in self:
+            rec.related_ids = False
         # [(5)]
 
     def is_relation_field_ignore(self):
@@ -178,9 +185,10 @@ class ExternalDataSync(models.Model):
         ]
         existing = self.search(domain, limit=1)
         if existing:
-            if existing.external_last_update >= external_last_update and existing.internal_odoo_id:
+            if not existing.is_force_update_from_external() and existing.external_last_update >= external_last_update and existing.internal_odoo_id:
                 _logger.info("Data tidak perlu di update karena data lebih baru atau sama.")
                 return existing
+
             if existing.state != 'process' and existing.is_update_able_from_external():
                 input_dict['state'] = 'process'
                 existing.write(input_dict)
@@ -292,6 +300,11 @@ class ExternalDataSync(models.Model):
 
         return input_dict
 
+    @api.model
+    def is_force_update_from_external(self):
+        # todo implementasi force update
+        return True
+
     def is_update_able_from_external(self):
         return self.sync_strategy_id.is_update_able_from_external()
 
@@ -313,8 +326,8 @@ class ExternalDataSync(models.Model):
             ModelObject = self.env[self.internal_model]
             item = json.loads(self.data_json)
             internal_odoo_id = self.internal_odoo_id
-            if not internal_odoo_id and is_callable_method(ModelObject, 'lookup_internal_from_external_data'):
-                internal_odoo = ModelObject.lookup_internal_from_external_data(item, external_data_sync=self)
+            if not internal_odoo_id:
+                internal_odoo = self.sync_strategy_id.internal_lookup(item)
                 if internal_odoo:
                     self.write_done_internal_odoo(internal_odoo)
                     internal_odoo_id = internal_odoo.id
@@ -374,7 +387,8 @@ class ExternalDataSync(models.Model):
             self._cr.commit()
 
     def action_process_data(self):
-        self.process_data()
+        for rec in self:
+            rec.process_data()
 
     def action_open_internal(self):
         self.ensure_one()
@@ -388,7 +402,7 @@ class ExternalDataSync(models.Model):
 
     def action_get_json_data_for_create(self):
         self.ensure_one()
-        self.get_json_data_for_create()
+        self.data_json = json.dumps(self.get_external_one_data())
 
     def cron_process_data(self, limit=100):
         limit_time = fields.Datetime.now() + datetime.timedelta(minutes=10)

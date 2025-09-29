@@ -1,9 +1,9 @@
 <odoo>
     <data>
 
-        <record id="external_data_sync_model_filter" model="ir.ui.view">
-            <field name="name">external.data.sync.strategy.search</field>
-            <field name="model">external.data.sync.strategy</field>
+        <record id="external_data_sync_cron_filter" model="ir.ui.view">
+            <field name="name">external.data.sync.cron.search</field>
+            <field name="model">external.data.sync.cron</field>
             <field name="arch" type="xml">
                 <search string="External Data">
 <!--                    <field name="name"/>-->
@@ -21,17 +21,26 @@
             </field>
         </record>
 
-        <record id="external_data_sync_model_form" model="ir.ui.view">
-            <field name="name">external.data.sync.strategy.form</field>
-            <field name="model">external.data.sync.strategy</field>
+        <record id="external_data_sync_cron_form" model="ir.ui.view">
+            <field name="name">external.data.sync.cron.form</field>
+            <field name="model">external.data.sync.cron</field>
             <field name="priority" eval="99" />
             <field name="arch" type="xml">
                 <form string="sync">
                     <header>
                         <button name="action_sync_now" type="object" string="Sync Data From Server" class="oe_highlight" />
 <!--                        <field name="state" readonly="1" widget="statusbar" statusbar_visible="progress,done"/>-->
+
                     </header>
                     <sheet>
+                        <div class="oe_button_box" name="button_box"/>
+                        <widget name="web_ribbon" title="Archived" bg_color="bg-danger" attrs="{'invisible': [('active', '=', True)]}"/>
+                        <div class="oe_title">
+                            <field name="active" invisible="1"/>
+<!--                            <h1>-->
+<!--                                <field name="name" default_focus="1" placeholder="Name"/>-->
+<!--                            </h1>-->
+                        </div>
                         <group>
                             <group>
 <!--                                <field name="name"/>-->
@@ -47,7 +56,7 @@
                             <page string="Sync Data / Cron">
                                 <group>
                                     <group>
-                                        <field name="sync_cron" />
+<!--                                        <field name="sync_cron" />-->
                                         <field name="external_sync" />
                                         <field name="strategy" />
                                     </group>
@@ -67,8 +76,8 @@
                                     <group>
                                         <field name="external_model"/>
                                         <field name="external_fields"/>
-                                        <field name="parent_sync_strategy_id"/>
-                                        <field name="parent_field_name" />
+<!--                                        <field name="parent_sync_strategy_id"/>-->
+<!--                                        <field name="parent_field_name" />-->
                                     </group>
                                     <group>
                                         <field name="internal_model" />
@@ -90,7 +99,7 @@
                                         <field name="eval_script"/>
                                     </tree>
                                 </field>
-                                <field name="line_sync_strategy_ids" readonly="1">
+                                <field name="line_sync_strategy_ids">
                                     <tree>
                                         <field name="parent_field_name"/>
                                         <field name="external_model"/>
@@ -104,9 +113,9 @@
             </field>
         </record>
 
-        <record id="external_data_sync_model_tree" model="ir.ui.view">
-            <field name="name">external.data.sync.strategy.tree</field>
-            <field name="model">external.data.sync.strategy</field>
+        <record id="external_data_sync_cron_tree" model="ir.ui.view">
+            <field name="name">external.data.sync.cron.tree</field>
+            <field name="model">external.data.sync.cron</field>
             <field name="priority" eval="99" />
             <field name="arch" type="xml">
                 <tree >
@@ -128,10 +137,10 @@
             </field>
         </record>
 
-        <record model="ir.actions.act_window" id="external_data_sync_strategy_action">
-            <field name="name">External Data Sync Strategy</field>
+        <record model="ir.actions.act_window" id="external_data_sync_cron_action">
+            <field name="name">External Data Sync Cron</field>
             <field name="type">ir.actions.act_window</field>
-            <field name="res_model">external.data.sync.strategy</field>
+            <field name="res_model">external.data.sync.cron</field>
             <field name="view_mode">tree,form</field>
             <field name="domain">[]</field>
 <!--            <field name="context">{'update': False}</field>-->
