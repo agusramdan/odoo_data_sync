@@ -114,9 +114,11 @@ class ExternalDataSync(models.Model):
 
     def get_json_data_for_create(self):
         json_date = json.loads(self.data_json)
-        if not isinstance(json_date, dict):
-            json_data = self.get_external_one_data()
-            self.data_json = json.dumps(json_data)
+        if isinstance(json_date, dict):
+            return json_date
+
+        json_data = self.get_external_one_data()
+        self.data_json = json.dumps(json_data)
         return json_data
 
     def action_reset_related(self):
@@ -317,8 +319,8 @@ class ExternalDataSync(models.Model):
             ModelObject = self.env[self.internal_model]
             item = json.loads(self.data_json)
             internal_odoo_id = self.internal_odoo_id
-            if not internal_odoo_id and is_callable_method(ModelObject, 'lookup_internal_from_external_data'):
-                internal_odoo = ModelObject.lookup_internal_from_external_data(item, external_data_sync=self)
+            if not internal_odoo_id:
+                internal_odoo = self.sync_strategy_id.internal_lookup(item)
                 if internal_odoo:
                     self.write_done_internal_odoo(internal_odoo)
                     internal_odoo_id = internal_odoo.id
@@ -392,7 +394,7 @@ class ExternalDataSync(models.Model):
 
     def action_get_json_data_for_create(self):
         self.ensure_one()
-        self.get_json_data_for_create()
+        self.data_json = json.dumps(self.get_external_one_data())
 
     def cron_process_data(self, limit=100):
         limit_time = fields.Datetime.now() + datetime.timedelta(minutes=10)
