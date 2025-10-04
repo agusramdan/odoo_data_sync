@@ -45,9 +45,9 @@ class ExternalDataSync(models.Model):
     server_sync_id = fields.Many2one(
         'external.server.sync'
     )
-    next_sync_datetime = fields.Datetime()
-    last_sync_datetime = fields.Datetime()
-    sync_cron = fields.Boolean()
+    # next_sync_datetime = fields.Datetime()
+    # last_sync_datetime = fields.Datetime()
+    # sync_cron = fields.Boolean()
     strategy = fields.Selection([
         ('local_lookup', 'Local Lookup'),
         ('external_cud', 'Create Update Delete'),
@@ -129,15 +129,7 @@ class ExternalDataSync(models.Model):
         return include_fields
 
     def get_mapping_fields(self):
-        #env = self.env
-        mapping_list = self.line_mapping_ids.filtered(lambda m: m.internal_field and  m.mapping_strategy=='field_mapping')
-
-        # env['external.data.mapping'].search([
-        #     ('sync_strategy_id', '=', self.id),
-        #     ('internal_model', '=', self.internal_model),
-        #     ('mapping_strategy', '=', 'field_mapping'),
-        #     ('internal_field', '!=', False)]
-        # )
+        mapping_list = self.line_mapping_ids.filtered(lambda m: m.internal_field and m.mapping_strategy=='field_mapping')
         return {
             m.internal_field: m for m in mapping_list
         }
@@ -295,10 +287,6 @@ class ExternalDataSync(models.Model):
         server_sync = self.get_server_sync()
         offset = 0
         row_count = limit = 100
-        self.write({
-            'last_sync_datetime': fields.Datetime.now(),
-        })
-
         domain = []
         if self.external_domain:
             domain = ast.literal_eval(self.external_domain)
@@ -322,33 +310,6 @@ class ExternalDataSync(models.Model):
                 )
 
         _logger.info("Offset %s = total %s", offset, total)
-        self.write({
-            'next_sync_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
-        })
-
-    def cron_sync_from_server(self):
-        limit_time = fields.Datetime.now() + datetime.timedelta(minutes=10)
-        data_sync_models = self.search([
-            ('active', '=', True),
-            ('sync_cron', '=', True),
-            ('strategy', 'in', ['external_cud', 'external_cu', 'external_create']),
-            ('parent_sync_strategy_id', '=', False),
-            '|',
-            ('next_sync_datetime', '<=', fields.Datetime.now()),
-            ('next_sync_datetime', '=', False),
-        ])
-        for data_sync in data_sync_models:
-            try:
-                data_sync.sync_from_application_server()
-            except Exception as e:
-                _logger.error(
-                    "Error sync from server %s , model %s : %s",
-                    data_sync.external_app_name,
-                    data_sync.external_model,
-                    traceback.format_exc()
-                )
-            if fields.Datetime.now() > limit_time:
-                break
 
     def get_internal_context(self):
         return self.internal_context and ast.literal_eval(self.internal_context) or {}

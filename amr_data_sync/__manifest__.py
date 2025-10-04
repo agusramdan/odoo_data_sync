@@ -17,7 +17,7 @@
         'views/data_sync_views.xml',
         'views/server_sync_views.xml',
         'views/data_sync_exclude_views.xml',
-        'views/data_sync_strategy_views.xml',
+        'views/data_sync_cron_views.xml',
         'views/data_lookup_views.xml',
         'views/res_user_view.xml',
         'views/ir_model_view.xml',

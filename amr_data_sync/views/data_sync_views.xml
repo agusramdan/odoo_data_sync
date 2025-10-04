@@ -47,6 +47,7 @@
                                 <field name="external_model"/>
                                 <field name="external_app_name"/>
                                 <field name="external_last_update"/>
+<!--                                <field name="display_name"/>-->
                             </group>
                             <group>
                                 <field name="internal_odoo_id" />
@@ -94,11 +95,12 @@
             <field name="priority" eval="99" />
             <field name="arch" type="xml">
                 <tree decoration-danger="state=='error'" decoration-success="state=='done'">
+                    <!-- Buttons in the tree view header are not supported in Odoo 13, so these lines are commented out -->
 <!--                    <header>-->
-<!--                        <button name="action_reset_data" type="object" string="Reset Dep. Data" class="oe_highlight" />-->
+<!--                        <button name="action_reset_related" type="object" string="Reset Related" class="oe_highlight"  />-->
+<!--                        <button name="action_process_data" type="object" string="Process Data" class="oe_highlight"  />-->
 <!--                    </header>-->
-<!--                    <field name="name"/>-->
-                    <field name="state" />
+                    <field name="display_name"/>
 <!--                    <field name="sync_type" />-->
 <!--                    <field name="model_id" />-->
                     <field name="external_odoo_id"/>
@@ -111,7 +113,7 @@
 
                     <field name="last_success"/>
                     <field name="last_error"/>
-
+                    <field name="state" />
                     <button name="action_open_internal" type="object"
                             string="Open Internal Data" class="oe_highlight" />
                 </tree>
@@ -126,7 +128,6 @@
             <field name="domain">[]</field>
             <field name="context">{'update': False}</field>
         </record>
-
 
     </data>
 </odoo>

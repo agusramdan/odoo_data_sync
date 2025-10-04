@@ -2,7 +2,7 @@
 <odoo>
     <record model="ir.cron" id="external_data_sync_from_server_cron">
         <field name="name">External Data Sync Cron</field>
-        <field name="model_id" ref="model_external_data_sync_strategy"/>
+        <field name="model_id" ref="model_external_data_sync_cron"/>
         <field name="state">code</field>
         <field name="code">model.cron_sync_from_server()</field>
         <field name="user_id" ref="base.user_root"/>

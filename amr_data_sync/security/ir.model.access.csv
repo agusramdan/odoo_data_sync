@@ -8,6 +8,9 @@ access_external_server_sync_admin,external.server.sync Admin,model_external_serv
 access_external_data_sync_strategy_user,external.data.sync.strategy User,model_external_data_sync_strategy,base.group_user,1,0,0,0
 access_external_data_sync_strategy_admin,external.data.sync.strategy Admin,model_external_data_sync_strategy,base.group_erp_manager,1,1,1,1
 
+access_external_data_sync_cron_user,external.data.sync.cron User,model_external_data_sync_cron,base.group_user,1,0,0,0
+access_external_data_sync_cron_admin,external.data.sync.cron Admin,model_external_data_sync_cron,base.group_erp_manager,1,1,1,1
+
 access_external_data_mapping_user,external.data.mapping User,model_external_data_mapping,base.group_user,1,0,0,0
 access_external_data_mapping_admin,external.data.mapping Admin,model_external_data_mapping,base.group_erp_manager,1,1,1,1
 

@@ -122,7 +122,8 @@ class ExternalDataSync(models.Model):
         return json_data
 
     def action_reset_related(self):
-        self.related_ids = False
+        for rec in self:
+            rec.related_ids = False
         # [(5)]
 
     def is_relation_field_ignore(self):
@@ -184,9 +185,10 @@ class ExternalDataSync(models.Model):
         ]
         existing = self.search(domain, limit=1)
         if existing:
-            if existing.external_last_update >= external_last_update and existing.internal_odoo_id:
+            if not existing.is_force_update_from_external() and existing.external_last_update >= external_last_update and existing.internal_odoo_id:
                 _logger.info("Data tidak perlu di update karena data lebih baru atau sama.")
                 return existing
+
             if existing.state != 'process' and existing.is_update_able_from_external():
                 input_dict['state'] = 'process'
                 existing.write(input_dict)
@@ -298,6 +300,11 @@ class ExternalDataSync(models.Model):
 
         return input_dict
 
+    @api.model
+    def is_force_update_from_external(self):
+        # todo implementasi force update
+        return True
+
     def is_update_able_from_external(self):
         return self.sync_strategy_id.is_update_able_from_external()
 
@@ -380,7 +387,8 @@ class ExternalDataSync(models.Model):
             self._cr.commit()
 
     def action_process_data(self):
-        self.process_data()
+        for rec in self:
+            rec.process_data()
 
     def action_open_internal(self):
         self.ensure_one()

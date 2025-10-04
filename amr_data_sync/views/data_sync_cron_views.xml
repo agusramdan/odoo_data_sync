@@ -1,0 +1,151 @@
+<odoo>
+    <data>
+
+        <record id="external_data_sync_cron_filter" model="ir.ui.view">
+            <field name="name">external.data.sync.cron.search</field>
+            <field name="model">external.data.sync.cron</field>
+            <field name="arch" type="xml">
+                <search string="External Data">
+<!--                    <field name="name"/>-->
+<!--                    <searchpanel>-->
+<!--                        <field name="internal_model" icon="fa-home" enable_counters="1"/>-->
+<!--                    </searchpanel>-->
+<!--                    <separator/>-->
+<!--                    <separator/>-->
+                    <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
+                    <group expand="0" string="Group By">
+                        <filter name="group_external_model" string="Model" domain="[]" context="{'group_by': 'external_model'}"/>
+                        <filter name="group_application_name" string="Application Name" domain="[]" context="{'group_by': 'external_app_name'}"/>
+                    </group>
+                </search>
+            </field>
+        </record>
+
+        <record id="external_data_sync_cron_form" model="ir.ui.view">
+            <field name="name">external.data.sync.cron.form</field>
+            <field name="model">external.data.sync.cron</field>
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <form string="sync">
+                    <header>
+                        <button name="action_sync_now" type="object" string="Sync Data From Server" class="oe_highlight" />
+<!--                        <field name="state" readonly="1" widget="statusbar" statusbar_visible="progress,done"/>-->
+
+                    </header>
+                    <sheet>
+                        <div class="oe_button_box" name="button_box"/>
+                        <widget name="web_ribbon" title="Archived" bg_color="bg-danger" attrs="{'invisible': [('active', '=', True)]}"/>
+                        <div class="oe_title">
+                            <field name="active" invisible="1"/>
+<!--                            <h1>-->
+<!--                                <field name="name" default_focus="1" placeholder="Name"/>-->
+<!--                            </h1>-->
+                        </div>
+                        <group>
+                            <group>
+<!--                                <field name="name"/>-->
+                                <field name="server_sync_id"/>
+                                <field name="external_app_name"/>
+                            </group>
+                            <group>
+                                <field name="next_sync_datetime" />
+                                <field name="last_sync_datetime"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Sync Data / Cron">
+                                <group>
+                                    <group>
+<!--                                        <field name="sync_cron" />-->
+                                        <field name="external_sync" />
+                                        <field name="strategy" />
+                                    </group>
+                                    <group>
+                                        <field name="external_domain"/>
+                                        <field name="external_context"/>
+
+                                        <field name="internal_lookup_fields" />
+                                        <field name="internal_lookup_method" />
+
+                                        <field name="internal_call_method" />
+                                    </group>
+                                </group>
+                            </page>
+                            <page string="Mapping">
+                                <group>
+                                    <group>
+                                        <field name="external_model"/>
+                                        <field name="external_fields"/>
+<!--                                        <field name="parent_sync_strategy_id"/>-->
+<!--                                        <field name="parent_field_name" />-->
+                                    </group>
+                                    <group>
+                                        <field name="internal_model" />
+                                        <field name="exclude_fields" />
+                                        <field name="internal_process_method" />
+                                        <field name="internal_context" />
+                                        <field name="relation_field_ignore"/>
+                                    </group>
+                                </group>
+                                <field name="line_mapping_ids" context="{'default_sync_strategy_id': active_id}">
+                                    <tree editable="bottom">
+                                        <field name="sequence" widget="handle"/>
+                                        <field name="active"/>
+                                        <field name="internal_field"/>
+                                        <field name="mapping_strategy"/>
+                                        <field name="description"/>
+                                        <field name="key_name"/>
+                                        <field name="function_name"/>
+                                        <field name="eval_script"/>
+                                    </tree>
+                                </field>
+                                <field name="line_sync_strategy_ids">
+                                    <tree>
+                                        <field name="parent_field_name"/>
+                                        <field name="external_model"/>
+                                        <field name="internal_model"/>
+                                    </tree>
+                                </field>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="external_data_sync_cron_tree" model="ir.ui.view">
+            <field name="name">external.data.sync.cron.tree</field>
+            <field name="model">external.data.sync.cron</field>
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <tree >
+<!--                    <header>-->
+<!--                        <button name="action_reset_data" type="object" string="Reset Dep. Data" class="oe_highlight" />-->
+<!--                    </header>-->
+<!--                    <field name="name"/>-->
+<!--                    <field name="state" />-->
+<!--                    <field name="sync_type" />-->
+<!--                    <field name="model_id" />-->
+                    <field name="server_sync_id"/>
+                    <field name="external_app_name"/>
+                    <field name="external_model"/>
+                    <field name="internal_model"/>
+
+                    <field name="next_sync_datetime"/>
+                    <field name="last_sync_datetime"/>
+                </tree>
+            </field>
+        </record>
+
+        <record model="ir.actions.act_window" id="external_data_sync_cron_action">
+            <field name="name">External Data Sync Cron</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">external.data.sync.cron</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[]</field>
+<!--            <field name="context">{'update': False}</field>-->
+        </record>
+
+
+    </data>
+</odoo>
