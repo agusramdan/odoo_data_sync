@@ -2,6 +2,8 @@
 
 import ast
 import datetime
+from collections import defaultdict
+
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 from ..tools.utils import is_callable_method
@@ -58,7 +60,7 @@ class ExternalDataSync(models.Model):
     data_json = fields.Text()
     error_info = fields.Text()
 
-    next_processing_datetime = fields.Datetime()
+    next_processing_datetime = fields.Datetime(default=fields.Datetime.now)
     last_processing_datetime = fields.Datetime()
 
     related_ids = fields.One2many(
@@ -67,6 +69,9 @@ class ExternalDataSync(models.Model):
         help="Related data linked to this external data sync record."
     )
 
+    def get_external_application_name(self):
+        return self.external_app_name or (self.server_sync_id and self.server_sync_id.get_application_name()) or None
+
     def create(self, vals_list):
         for vals in vals_list:
             if 'sync_strategy_id' in vals and vals['sync_strategy_id']:
@@ -74,7 +79,7 @@ class ExternalDataSync(models.Model):
                 if not strategy:
                     raise UserError(_("Strategy dengan ID %s tidak ditemukan") % vals['sync_strategy_id'])
                 vals['external_model'] = strategy.external_model
-                vals['external_app_name'] = strategy.external_app_name or strategy.server_sync_id.app_name
+                vals['external_app_name'] = strategy.get_external_application_name()
                 vals['internal_model'] = strategy.internal_model or strategy.external_model
 
             if 'state' not in vals or not vals['state']:
@@ -140,16 +145,15 @@ class ExternalDataSync(models.Model):
     def get_related_data(self, field, value):
 
         related = self.related_ids.filtered(lambda r: r.name == field.name)
-
         if related:
             related.data_json = json.dumps(value)
-        elif self.sync_strategy_id:
+        elif self.sync_strategy_id and value:
             parent_sync_strategy = self.sync_strategy_id
-            sync_strategy = self.sync_strategy_id.lookup_strategy(
-                field.comodel_name, parent_sync_strategy=parent_sync_strategy,
-                external_app_name=parent_sync_strategy.external_app_name)
-            if sync_strategy or (
-                    field.type == 'one2many' and value and isinstance(value, list) and isinstance(value[0], dict)):
+            sync_strategy = self.sync_strategy_id.lookup_strategy(field.comodel_name,
+                                                                  parent_sync_strategy=parent_sync_strategy,
+                                                                  external_app_name=parent_sync_strategy.external_app_name)
+
+            if sync_strategy and field.type == 'one2many' and isinstance(value, list) and isinstance(value[0], dict):
                 self.related_ids.create({
                     'external_data_sync_id': self.id,
                     'sync_strategy_id': sync_strategy.id,
@@ -160,13 +164,22 @@ class ExternalDataSync(models.Model):
                     'state': 'draft',
                     'data_json': json.dumps(value)
                 })
-
+            elif field.type == 'many2one':
+                self.related_ids.create({
+                    'external_data_sync_id': self.id,
+                    'sync_strategy_id': int(sync_strategy) or None,
+                    'name': field.name,
+                    'internal_model': field.comodel_name,
+                    'field_type': field.type,
+                    'state': 'draft',
+                    'data_json': json.dumps(value)
+                })
             return None
-
         return related.get_data_relation()
 
     def data_from_external(self, item, sync_strategy):
-
+        if not sync_strategy:
+            raise UserError("Sync Strategy Not found")
         external_odoo_id = item.get('id')
         external_last_update = item.get('write_date')
         display_name = item.get('display_name')
@@ -199,14 +212,13 @@ class ExternalDataSync(models.Model):
                 external_odoo_id=external_odoo_id,
                 sync_strategy_id=sync_strategy.id,
             )
-            if sync_strategy:
-                internal = sync_strategy.internal_lookup(item)
-                if internal:
-                    input_dict.update(
-                        internal_odoo_id=internal.id,
-                        state='done',
-                        last_success=fields.Datetime.now(),
-                    )
+            internal = sync_strategy.internal_lookup(item)
+            if internal:
+                input_dict.update(
+                    internal_odoo_id=internal.id,
+                    state='done',
+                    last_success=fields.Datetime.now(),
+                )
             existing = self.create([input_dict])[0]
 
         return existing
@@ -228,17 +240,17 @@ class ExternalDataSync(models.Model):
 
         parent_external_data_sync = sync_related.external_data_sync_id
         internal_model = sync_related.internal_model
+        external_app_name = sync_related.external_app_name
         domain = [
             ('external_odoo_id', '=', external_odoo_id),
+            ('external_app_name', '=', external_app_name),
             ('internal_model', '=', internal_model)
         ]
         existing = self.search(domain, limit=1)
         if existing:
-            if existing.state != 'process' and existing.is_update_able_from_external():
+            if existing.state != 'done' and existing.is_update_able_from_external():
                 input_dict = {'state': 'process'}
                 existing.write(input_dict)
-            else:
-                return existing
         elif sync_related.sync_strategy_id:
             input_dict = {
                 'display_name': display_name or f'ID {external_odoo_id}',
@@ -253,13 +265,13 @@ class ExternalDataSync(models.Model):
 
         return existing
 
-    def prepare_input_external(self, item, **kwargs):
+    def prepare_input_external(self, item, sync_strategy=None, **kwargs):
         parent_object = self
-        sync_strategy = self.get_sync_strategy()
+        if not sync_strategy:
+            sync_strategy = self.get_sync_strategy()
         model_object = self.env[self.internal_model]
         if sync_strategy:
-            input_dict = self.get_sync_strategy().prepare_input_external(parent_object, item, **kwargs)
-
+            input_dict = sync_strategy.prepare_input_external(parent_object, item, **kwargs)
         else:
             _fields = model_object._fields
 
@@ -298,6 +310,9 @@ class ExternalDataSync(models.Model):
         if is_callable_method(model_object, 'prepare_input_dict'):
             input_dict.update(model_object.prepare_input_dict(item, input_dict=input_dict))
 
+        if sync_strategy:
+            result = sync_strategy.execute_prepare_eval(item, input_dict)
+            input_dict.update(result)
         return input_dict
 
     @api.model
@@ -307,6 +322,9 @@ class ExternalDataSync(models.Model):
 
     def is_update_able_from_external(self):
         return self.sync_strategy_id.is_update_able_from_external()
+
+    def is_update_only_from_external(self):
+        return self.sync_strategy_id.is_update_only_from_external()
 
     def is_create_able_from_external(self):
         return self.sync_strategy_id.is_create_able_from_external()
@@ -323,11 +341,12 @@ class ExternalDataSync(models.Model):
 
     def process_data(self):
         try:
-            ModelObject = self.env[self.internal_model]
+            sync_strategy = self.get_sync_strategy()
+            ModelObject = self.env[self.internal_model].with_context(sync_strategy._context)
             item = json.loads(self.data_json)
             internal_odoo_id = self.internal_odoo_id
             if not internal_odoo_id:
-                internal_odoo = self.sync_strategy_id.internal_lookup(item)
+                internal_odoo = sync_strategy.internal_lookup(item)
                 if internal_odoo:
                     self.write_done_internal_odoo(internal_odoo)
                     internal_odoo_id = internal_odoo.id
@@ -339,13 +358,15 @@ class ExternalDataSync(models.Model):
 
             if not item or not isinstance(item, dict):
                 item = self.get_json_data_for_create()
+            existing = None
 
-            if is_callable_method(ModelObject, self.sync_strategy_id.internal_process_method):
-                method = getattr(ModelObject, self.sync_strategy_id.internal_process_method)
-                existing = method(item, sync_strategy=self.sync_strategy_id, data_sync=self)
+            if is_callable_method(ModelObject, sync_strategy.internal_process_method):
+                method = getattr(ModelObject, sync_strategy.internal_process_method)
+                existing = method(item, sync_strategy=sync_strategy, data_sync=self)
                 self.write_done_internal_odoo(existing)
             else:
                 input_dict = self.prepare_input_external(item)
+
                 if self.is_all_related_done():
                     if internal_odoo_id:
                         existing = ModelObject.browse(internal_odoo_id)
@@ -361,16 +382,9 @@ class ExternalDataSync(models.Model):
                     _logger.info("Delay proses data karena masih ada related data yang belum selesai. (%s) [%s] %s"
                                  , self.internal_model, self.external_model, self.external_odoo_id)
 
-            if self.state == 'done':
-                after_create = {}
-                for r in self.related_ids:
-                    if r.field_after_create:
-                        r.process_data()
-                        data_relation = r.get_data_relation()
-                        if data_relation:
-                            after_create[r.name] = data_relation
-                if after_create:
-                    existing.write(after_create)
+            if self.state == 'done' and existing:
+                self.process_field_after_create(existing)
+
         except BaseException as ex:
             self._cr.rollback()
             stack_trace = traceback.format_exc()
@@ -393,7 +407,7 @@ class ExternalDataSync(models.Model):
     def action_open_internal(self):
         self.ensure_one()
         return {
-            'name': _('Data Internal Data'),
+            'name': _('Internal Data'),
             'type': 'ir.actions.act_window',
             'res_model': self.internal_model,
             'res_id': self.internal_odoo_id,
@@ -404,18 +418,22 @@ class ExternalDataSync(models.Model):
         self.ensure_one()
         self.data_json = json.dumps(self.get_external_one_data())
 
-    def cron_process_data(self, limit=100):
+    def cron_process_data(self, limit=1000):
         limit_time = fields.Datetime.now() + datetime.timedelta(minutes=10)
         to_process = self.search(
             [('state', '!=', 'done'),
              '|',
-             ('last_processing_datetime', '<=', fields.Datetime.now()),
-             ('last_processing_datetime', '=', False)],
-            limit=limit, order='last_processing_datetime asc,id asc'
+             ('next_processing_datetime', '<=', fields.Datetime.now()),
+             ('next_processing_datetime', '=', False)],
+            limit=limit, order='next_processing_datetime asc,last_processing_datetime asc, id '
         )
         for t in to_process:
             try:
+                t.write({
+                    'last_processing_datetime': fields.Datetime.now(),
+                })
                 t.process_data()
+                self._cr.commit()
             except Exception:
                 self._cr.rollback()
                 t.write({
@@ -424,6 +442,29 @@ class ExternalDataSync(models.Model):
                     'last_error': fields.Datetime.now(),
                     'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
                 })
+            if fields.Datetime.now() > limit_time:
+                break
+
+        sync_related = self.env['external.data.sync.related'].search(
+            [('state', '!=', 'done')], order='write_date,external_data_sync_id', limit=limit, )
+        external_data_sync = self.browse()
+        limit_time = fields.Datetime.now() + datetime.timedelta(minutes=10)
+        for t in sync_related:
+            try:
+                t.process_data()
+                if t.state == 'done' and t.external_data_sync_id:
+                    external_data_sync |= t.external_data_sync_id
+            except Exception:
+                continue
+            if fields.Datetime.now() > limit_time:
+                break
+
+        limit_time = fields.Datetime.now() + datetime.timedelta(minutes=10)
+        for t in external_data_sync:
+            try:
+                t.process_data()
+            except Exception:
+                continue
             if fields.Datetime.now() > limit_time:
                 break
 
@@ -436,112 +477,125 @@ class ExternalDataSync(models.Model):
         if self.internal_model:
             model = self.env[self.internal_model]
             if self.internal_odoo_id:
-                return model.browse(self.internal_odoo_id)
+                return model.search([('id', '=', self.internal_odoo_id)])
             return model
         return None
 
+    def process_field_after_create(self, existing):
+        after_create = {}
+        for r in self.related_ids:
+            if r.field_after_create:
+                r.process_data()
+                data_relation = r.get_data_relation()
+                if data_relation:
+                    after_create[r.name] = data_relation
+        if after_create:
+            existing.write(after_create)
 
-class ExternalDataSyncRelated(models.Model):
-    _name = 'external.data.sync.related'
+    def action_process_field_after_create(self):
+        for rec in self.filtered(lambda r: r.state == 'done' and r.internal_odoo_id):
+            existing = rec.get_internal_object()
+            if existing:
+                rec.process_field_after_create(existing)
 
-    external_data_sync_id = fields.Many2one('external.data.sync', ondelete='cascade')
-    sync_strategy_id = fields.Many2one(
-        'external.data.sync.strategy',
-    )
-    external_app_name = fields.Char(related='external_data_sync_id.external_app_name')
-    name = fields.Char()
-    internal_model = fields.Char()
-    inverse_field = fields.Char()
-    field_after_create = fields.Boolean()
-    field_type = fields.Selection(
-        [('many2one', 'Many2one'), ('one2many', 'One2many'), ('many2many', 'Many2many')],
-    )
-    state = fields.Selection(
-        [('draft', 'Draft'), ('process', 'Process'), ('error', 'Error'), ('done', 'Done'), ]
-    )
-    data_json = fields.Text()
-    internal_data_eval = fields.Text()
-
-    def process_data(self):
-        try:
-            item = json.loads(self.data_json)
-            self.field_after_create = self.external_data_sync_id.internal_model == self.internal_model
-            if self.field_type == 'many2one':
-                external_data_sync = self.external_data_sync_id.relation_from_external(item, self)
-                if external_data_sync:
-                    if self.field_after_create and external_data_sync.state != 'done':
-                        return  # untuk menghindari loop
-
-                    external_data_sync.process_data()
-                    if external_data_sync.state == 'done' and external_data_sync.internal_odoo_id:
-                        self.internal_data_eval = str(external_data_sync.internal_odoo_id)
-                        self.state = 'done'
-
-            elif self.field_type == 'many2many':
-                if not isinstance(item, list):
-                    item = [item]
-                internal_ids = []
-                for i in item:
-                    external_data_sync = self.external_data_sync_id.relation_from_external(i, self)
-                    if external_data_sync:
-                        self.field_after_create = self.external_data_sync_id.id == external_data_sync.id
-                        if self.field_after_create and external_data_sync.state != 'done':
-                            return  # untuk menghindari loop
-
-                        external_data_sync.process_data()
-                        if external_data_sync.state == 'done' and external_data_sync.internal_odoo_id:
-                            internal_ids.append(external_data_sync.internal_odoo_id)
-                            continue
-                    internal_ids.append(None)
-                if internal_ids and all(isinstance(i, int) for i in internal_ids):
-                    self.internal_data_eval = str((6, 0, [internal_ids]))  # replace relasi dengan daftar ID baru
-                    self.state = 'done'
-            elif self.field_type == 'one2many':
-                # todo untuk update one2many
-                if self.field_after_create:
-                    ids = []
-                    for i in item:
-                        external_data_sync = self.external_data_sync_id.relation_from_external(i, self)
-                        ids.append(external_data_sync)
-
-                    for external_data_sync in ids:
-                        if not external_data_sync or external_data_sync.id == self.external_data_sync_id.id or external_data_sync.internal_odoo_id or external_data_sync.state == 'done':
-                            continue
-                        external_data_sync.process_data()
-                else:
-                    internal_ids = [(5, 0, 0)]  # → clear semua relasi
-                    InternalModel = self.env[self.internal_model]
-                    has_external_odoo_id = 'external_odoo_id' in InternalModel._fields
-                    if not isinstance(item, list):
-                        item = [item]
-                    for d in item:
-                        external_odoo_id = d.pop('id')
-                        if has_external_odoo_id and self.external_data_sync_id.internal_odoo_id:
-                            domain = [
-                                ('external_odoo_id', '=', external_odoo_id),
-                                (self.inverse_field, '=', self.external_data_sync_id.internal_odoo_id)
-                            ]
-                            existing = InternalModel.search(domain, limit=1)
-                            if existing:
-                                d['external_odoo_id'] = external_odoo_id
-                                internal_ids.append((1, existing.id, d))  # update record yang sudah ada
-                                continue
-                        internal_ids.append((0, 0, d))  # buat record baru & link
-                    self.internal_data_eval = str(internal_ids)
-                    self.state = 'done'
-
-        except Exception:
-            stack_trace = traceback.format_exc()
-            self.write({
-                'state': 'error',
-                'internal_data_eval': None,
-            })
-            _logger.error("Error process related data %s : %s", self.name, stack_trace)
-
-    def get_data_relation(self):
-        if self.state != 'done':
-            self.process_data()
-        if self.state == 'done' and self.internal_data_eval:
-            return ast.literal_eval(self.internal_data_eval)
-
+    def get_last_sync_datetime(self, strategy):
+        domain = [
+            ('sync_strategy_id', '=', strategy.id),
+            ('state', '=', 'done'),
+            ('internal_odoo_id', '!=', False),
+        ]
+        last_sync = self.search(domain, order='last_success desc', limit=1)
+        if last_sync:
+            return last_sync.last_success
         return None
+
+    def get_sync_strategy(self):
+        return self.sync_strategy_id.ensure_internal_context()
+
+    def get_or_create(self, external_data, sync_strategy):
+        external_data = self.ensure_external_data(external_data)
+        external_odoo_id = external_data.get('id')
+        domain = [
+            ('external_odoo_id', '=', external_odoo_id),
+            ('sync_strategy_id', '=', sync_strategy.id)
+        ]
+        existing = self.search(domain, limit=1)
+        if existing:
+            return existing
+        else:
+            return self.data_from_external(external_data, sync_strategy)
+
+    def reverse_mapping(
+            self, internal,
+            sync_strategy=None,
+            external_app_name=None,
+            external_model=None,
+            raise_not_found_exception=True
+    ):
+        # digunakan untuk mengirim data ke server external
+        if not internal:
+            return [0]
+
+        if not isinstance(internal, models.BaseModel):
+            _logger.error("Internal Object must")
+            if raise_not_found_exception:
+                raise ValueError("Internal Object must")
+            return [0]
+
+        if sync_strategy:
+            return sync_strategy.reverse_mapping(internal, raise_not_found_exception=raise_not_found_exception)
+
+        if not external_app_name:
+            _logger.error("external_app_name not set")
+            if raise_not_found_exception:
+                raise ValueError("external_app_name not set")
+            return [0]
+
+        if not external_model:
+            _logger.error("external_model not set")
+            if raise_not_found_exception:
+                raise ValueError("external_model not set")
+            return [0]
+
+        domain = [('internal_odoo_id', 'in', internal.ids), ('external_app_name', '=', external_app_name),
+                  ('external_model', '=', external_model), ('internal_model', '=', internal._name)]
+
+        rows = self.search_read(
+            domain,
+            fields=['internal_odoo_id', 'external_odoo_id']
+        )
+
+        mapping = defaultdict(list)
+        for r in rows:
+            mapping[r['internal_odoo_id']].append(r['external_odoo_id'])
+
+        result_map = dict(mapping)
+
+        not_mapped_ids = set(internal.ids) - result_map.keys()
+        if not_mapped_ids:
+            _logger.error("found not mapped data")
+            if raise_not_found_exception:
+                raise ValueError("found not mapped data [%s]" % str(not_mapped_ids))
+
+        return result_map
+
+    @api.model
+    def ensure_external_data(self, external_data):
+        if isinstance(external_data, dict):
+            return external_data
+        if isinstance(external_data, list):
+            if len(external_data) == 2:
+                return {
+                    'id': external_data[0],
+                    'display_name': external_data[1]
+                }
+            elif external_data:
+                return {
+                    'id': external_data[0],
+                }
+
+        if isinstance(external_data, int):
+            return {
+                'id': external_data
+            }
+        return {}

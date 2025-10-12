@@ -31,6 +31,4 @@ class ResUsers(models.Model):
                 return self.sudo().search([('email', '=', item_dict.get('email'))], limit=1)
             elif item_dict.get('login'):
                 return self.sudo().search([('login', '=', item_dict.get('login'))], limit=1)
-            elif item_dict.get('name'):
-                return self.sudo().search([('name', '=', item_dict.get('name'))], limit=1)
         return self.browse()

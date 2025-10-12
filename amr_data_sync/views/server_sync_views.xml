@@ -8,7 +8,7 @@
                 <form string="sync">
                     <header>
                         <button name="action_get_db_name" type="object" string="Get DB Name" class="oe_highlight"  />
-                        <button name="jsonrpc_authenticate" type="object" string="Authenticate" class="oe_highlight"  />
+                        <button name="action_authenticate" type="object" string="Authenticate" class="oe_highlight"  />
                     </header>
                     <sheet>
                         <group>

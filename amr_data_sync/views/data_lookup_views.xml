@@ -23,12 +23,15 @@
             <field name="arch" type="xml">
                 <form string="sync">
                     <header>
+                        <button name="action_open_internal" type="object"
+                            string="Open Data" class="oe_highlight" attrs="{'invisible':[('internal_id','=',0)]}"/>
                     </header>
                     <sheet>
                         <group>
                             <group>
                                 <field name="name"/>
                                 <field name="external_model"/>
+                                <field name="external_id"/>
                                 <field name="external_app_name"/>
                             </group>
                             <group>
@@ -50,16 +53,20 @@
                     <field name="active" invisible="1"/>
                     <field name="name"/>
                     <field name="external_model"/>
+                    <field name="external_id"/>
                     <field name="external_app_name"/>
                     <field name="internal_model"/>
+                    <field name="internal_id"/>
                     <button name="action_open_internal" type="object"
-                            string="Open Internal Data" class="oe_highlight" />
+                            string="Open Data" class="oe_highlight"
+                            attrs="{'invisible':[('internal_id','=',0)]}"
+                    />
                 </tree>
             </field>
         </record>
 
         <record model="ir.actions.act_window" id="external_data_lookup_action">
-            <field name="name">External Data Lookup </field>
+            <field name="name">Data Lookup</field>
             <field name="type">ir.actions.act_window</field>
             <field name="res_model">external.data.lookup</field>
             <field name="view_mode">tree,form</field>

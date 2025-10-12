@@ -21,7 +21,7 @@
             </field>
         </record>
 
-        <record id="external_data_sync_model_form" model="ir.ui.view">
+        <record id="external_data_sync_strategy_form" model="ir.ui.view">
             <field name="name">external.data.sync.strategy.form</field>
             <field name="model">external.data.sync.strategy</field>
             <field name="priority" eval="99" />
@@ -38,10 +38,6 @@
                                 <field name="server_sync_id"/>
                                 <field name="external_app_name"/>
                             </group>
-                            <group>
-                                <field name="next_sync_datetime" />
-                                <field name="last_sync_datetime"/>
-                            </group>
                         </group>
                         <notebook>
                             <page string="Sync Data / Cron">
@@ -50,6 +46,7 @@
                                         <field name="sync_cron" />
                                         <field name="external_sync" />
                                         <field name="strategy" />
+                                        <field name="filter_last_update"/>
                                     </group>
                                     <group>
                                         <field name="external_domain"/>
@@ -58,7 +55,7 @@
                                         <field name="internal_lookup_fields" />
                                         <field name="internal_lookup_method" />
 
-                                        <field name="internal_call_method" />
+                                        <field name="internal_call_method" attrs="{'invisible':[('external_sync','=','method_call')]}"/>
                                     </group>
                                 </group>
                             </page>
@@ -69,25 +66,29 @@
                                         <field name="external_fields"/>
                                         <field name="parent_sync_strategy_id"/>
                                         <field name="parent_field_name" />
+                                        <field name="relation_field_ignore"/>
                                     </group>
                                     <group>
                                         <field name="internal_model" />
                                         <field name="exclude_fields" />
                                         <field name="internal_process_method" />
                                         <field name="internal_context" />
-                                        <field name="relation_field_ignore"/>
+                                        <field name="company_id"/>
                                     </group>
                                 </group>
                                 <field name="line_mapping_ids" context="{'default_sync_strategy_id': active_id}">
                                     <tree editable="bottom">
-                                        <field name="sequence" widget="handle"/>
-                                        <field name="active"/>
+                                        <field name="sync_strategy_id" invisible="1"/>
+                                        <field name="sequence" widget="handle" />
+                                        <field name="active" />
+                                        <field name="name"/>
                                         <field name="internal_field"/>
                                         <field name="mapping_strategy"/>
-                                        <field name="description"/>
                                         <field name="key_name"/>
-                                        <field name="function_name"/>
-                                        <field name="eval_script"/>
+                                        <button name="action_open_view" type="object"
+                                                string="More" class="oe_highlight"
+                                                attrs="{'invisible':['|',('mapping_strategy','=','field_mapping'),('sync_strategy_id','=',0)]}"
+                                        />
                                     </tree>
                                 </field>
                                 <field name="line_sync_strategy_ids" readonly="1">
@@ -98,45 +99,41 @@
                                     </tree>
                                 </field>
                             </page>
+                            <page string="Script" attrs="{'invisible':[('internal_process_method','!=',False)]}">
+                                <group>
+                                    <field name="id" invisible="1"/>
+                                    <field name="test_external_data_sync_id" domain="[('sync_strategy_id','=',id)]" />
+                                </group>
+                                <field name="eval_script" widget="code"/>
+                            </page>
                         </notebook>
                     </sheet>
                 </form>
             </field>
         </record>
 
-        <record id="external_data_sync_model_tree" model="ir.ui.view">
+        <record id="external_data_sync_strategy_tree" model="ir.ui.view">
             <field name="name">external.data.sync.strategy.tree</field>
             <field name="model">external.data.sync.strategy</field>
             <field name="priority" eval="99" />
             <field name="arch" type="xml">
                 <tree >
-<!--                    <header>-->
-<!--                        <button name="action_reset_data" type="object" string="Reset Dep. Data" class="oe_highlight" />-->
-<!--                    </header>-->
-<!--                    <field name="name"/>-->
-<!--                    <field name="state" />-->
-<!--                    <field name="sync_type" />-->
-<!--                    <field name="model_id" />-->
                     <field name="server_sync_id"/>
                     <field name="external_app_name"/>
                     <field name="external_model"/>
                     <field name="internal_model"/>
-
-                    <field name="next_sync_datetime"/>
-                    <field name="last_sync_datetime"/>
+                    <field name="sync_cron" />
                 </tree>
             </field>
         </record>
 
         <record model="ir.actions.act_window" id="external_data_sync_strategy_action">
-            <field name="name">External Data Sync Strategy</field>
+            <field name="name">Data Sync Strategy</field>
             <field name="type">ir.actions.act_window</field>
             <field name="res_model">external.data.sync.strategy</field>
             <field name="view_mode">tree,form</field>
             <field name="domain">[]</field>
 <!--            <field name="context">{'update': False}</field>-->
         </record>
-
-
     </data>
 </odoo>
