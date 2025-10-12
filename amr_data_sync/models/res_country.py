@@ -11,8 +11,8 @@ from odoo.exceptions import ValidationError
 _logger = logging.getLogger(__name__)
 
 
-class ResPartnerUsers(models.Model):
-    _inherit = 'res.partner'
+class ResCountry(models.Model):
+    _inherit = 'res.country'
 
     def lookup_internal_from_external_data(self, item, **kwargs):
         item_dict = {}
@@ -26,7 +26,7 @@ class ResPartnerUsers(models.Model):
 
         if item_dict:
             domain = []
-            if item_dict.get('email'):
-                domain.append(('email', '=', item_dict.get('email')))
+            if item_dict.get('name'):
+                domain.append(('name', '=', item_dict.get('name')))
                 return self.sudo().search(domain, limit=1)
         return self.browse()

@@ -1,20 +1,16 @@
 # -*- coding: utf-8 -*-
 
-import ast
 import datetime
 from odoo import models, fields, api, _
-from odoo.exceptions import UserError
-import json
 import traceback
 import logging
-from odoo.tools.safe_eval import safe_eval
 
 _logger = logging.getLogger(__name__)
 
 
 class ExternalDataSyncCron(models.Model):
     _name = 'external.data.sync.cron'
-    _description = """Model strategy bagaimana object di synccron dari server external
+    _description = """Model strategy bagaimana object di sync cron dari server external
     """
     sync_strategy_id = fields.Many2one(
         'external.data.sync.strategy',
@@ -23,29 +19,29 @@ class ExternalDataSyncCron(models.Model):
     )
 
     active = fields.Boolean(default=True)
+    # sync_cron = fields.Boolean(default=True)
     next_sync_datetime = fields.Datetime()
     last_sync_datetime = fields.Datetime()
 
-    # @api.model_create_multi
-    # @api.returns('self', lambda value: value.id)
-    # def create(self, vals_list):
-    #     for vals in vals_list:
-    #         if 'server_sync_id' in vals and vals['server_sync_id']:
-    #             server = self.server_sync_id.browse(vals['server_sync_id'])
-    #             if not server:
-    #                 raise UserError(_("Server dengan ID %s tidak ditemukan") % vals['sync_strategy_id'])
-    #             vals['external_app_name'] = server.app_name
-    #
-    #     return super(ExternalDataSyncCron, self).create(vals_list)
-    #
-    # def write(self, vals):
-    #     if 'server_sync_id' in vals and vals['server_sync_id']:
-    #         server = self.server_sync_id.browse(vals['server_sync_id'])
-    #         if not server:
-    #             raise UserError(_("Server dengan ID %s tidak ditemukan") % vals['sync_strategy_id'])
-    #         vals['external_app_name'] = server.app_name
-    #
-    #     return super(ExternalDataSyncCron, self).write(vals)
+    @api.model_create_multi
+    @api.returns('self', lambda value: value.id)
+    def create(self, vals_list):
+        return super(ExternalDataSyncCron, self.with_context(__from_sync_cron=True)).create(vals_list)
+
+    def write(self, vals):
+        result = super(ExternalDataSyncCron, self).write(vals)
+        if self._context.get('__from_sync_cron'):
+            return result
+        if 'active' in vals:
+            for rec in self.with_context(__from_sync_cron=True):
+                if rec.sync_strategy_id and rec.active != rec.sync_strategy_id.sync_cron:
+                    rec.sync_strategy_id.write({
+                        'sync_cron': rec.active
+                    })
+        return result
+
+    def action_sync_now(self):
+        self.sync_strategy_id.action_sync_now()
 
     def cron_sync_from_server(self):
         limit_time = fields.Datetime.now() + datetime.timedelta(minutes=30)

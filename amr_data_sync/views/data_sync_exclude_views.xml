@@ -15,7 +15,7 @@
         </record>
 
         <record model="ir.actions.act_window" id="external_data_sync_exclude_action">
-            <field name="name">External Data Sync Exclude</field>
+            <field name="name">Data Sync Exclude</field>
             <field name="type">ir.actions.act_window</field>
             <field name="res_model">external.data.sync.exclude</field>
             <field name="view_mode">tree</field>

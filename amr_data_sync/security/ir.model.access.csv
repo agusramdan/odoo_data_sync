@@ -22,6 +22,3 @@ access_external_data_sync_exclude_admin,external.data.sync_exclude Admin,model_e
 
 access_external_data_sync_related_user,external.data.sync.related User,model_external_data_sync_related,base.group_user,1,1,1,0
 access_external_data_sync_related_admin,external.data.sync.related Admin,model_external_data_sync_related,base.group_erp_manager,1,1,1,1
-
-access_sync_access_token_user,access_sync_access_token,model_sync_access_token,base.group_user,1,0,0,0
-access_sync_access_token_admin,access_sync_access_token,model_sync_access_token,base.group_erp_manager,1,1,1,1

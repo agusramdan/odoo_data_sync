@@ -1,22 +1,17 @@
 # -*- coding: utf-8 -*-
 
-import ast
-import datetime
-from odoo import models, fields, api, _
-from odoo.exceptions import UserError
-import json
-import traceback
+from odoo import models, fields, _
 import logging
-from odoo.tools.safe_eval import safe_eval
 
 _logger = logging.getLogger(__name__)
-
 
 
 class ExternalDataSyncExclude(models.Model):
     _name = 'external.data.sync.exclude'
     _description = """
+Model untuk menyimpan konfigurasi exclude field atau model
     """
+
     active = fields.Boolean(default=True)
     exclude = fields.Selection([
         ('fields', 'Exclude Fields In Model'),
@@ -25,6 +20,20 @@ class ExternalDataSyncExclude(models.Model):
     ], default='fields')
     model = fields.Char(required=True)
     fields = fields.Char()
+
+    def get_exclude_all_fields(self):
+        env = self.env
+        exclude_fields = []
+        for exclude in self.search([('exclude', '=', 'all_fields'), ('active', '=', True)]):
+            try:
+                if exclude.model in env:
+                    model = env[exclude.model]
+                    if model._abstract:
+                        exclude_fields.extend(model._fields.keys())
+            except Exception as e:
+                _logger.error(f"Error evaluating exclude fields for model: {e}")
+                continue
+        return exclude_fields
 
     def get_exclude_fields(self, model_name):
         env = self.env

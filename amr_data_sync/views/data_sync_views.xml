@@ -6,7 +6,7 @@
             <field name="model">external.data.sync</field>
             <field name="arch" type="xml">
                 <search string="External Data">
-<!--                    <field name="name"/>-->
+                    <field name="display_name"/>
 <!--                    <searchpanel>-->
 <!--                        <field name="sync_strategy_id" icon="fa-home" enable_counters="1"/>-->
 <!--                    </searchpanel>-->
@@ -36,7 +36,8 @@
                         <button name="action_get_json_data_for_create" type="object" string="Get External Data" class="oe_highlight" />
                         <button name="action_reset_related" type="object" string="Reset Related" class="oe_highlight"  />
                         <button name="action_process_data" type="object" string="Process Data" class="oe_highlight"  />
-                        <button name="action_open_internal" type="object" string="Open Data" class="oe_highlight"  />
+                        <button name="action_process_field_after_create" type="object" string="Process After Create" class="oe_highlight"  />
+                        <button name="action_open_internal" type="object" string="Open Data" class="oe_highlight" attrs="{'invisible':[('internal_odoo_id','=',0)]}" />
                         <field name="state" readonly="1" widget="statusbar" statusbar_visible="progress,done"/>
                     </header>
                     <sheet>
@@ -47,13 +48,14 @@
                                 <field name="external_model"/>
                                 <field name="external_app_name"/>
                                 <field name="external_last_update"/>
-<!--                                <field name="display_name"/>-->
+                                <field name="display_name"/>
                             </group>
                             <group>
                                 <field name="internal_odoo_id" />
                                 <field name="internal_model"/>
                                 <field name="last_success" />
                                 <field name="last_error"/>
+                                <field name="next_processing_datetime" attrs="{'invisible':[('state','=','done')]}"/>
                             </group>
                         </group>
                         <notebook>
@@ -115,13 +117,13 @@
                     <field name="last_error"/>
                     <field name="state" />
                     <button name="action_open_internal" type="object"
-                            string="Open Internal Data" class="oe_highlight" />
+                            string="Open Internal Data" class="oe_highlight" attrs="{'invisible':[('internal_odoo_id','=',0)]}"/>
                 </tree>
             </field>
         </record>
 
         <record model="ir.actions.act_window" id="external_data_sync_action">
-            <field name="name">External Data Sync</field>
+            <field name="name">Data Sync Metadata</field>
             <field name="type">ir.actions.act_window</field>
             <field name="res_model">external.data.sync</field>
             <field name="view_mode">tree,form</field>

@@ -1,0 +1,57 @@
+<odoo>
+    <data>
+        <record id="external_data_mapping_form" model="ir.ui.view">
+            <field name="name">external.data.mapping.form</field>
+            <field name="model">external.data.mapping</field>
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <form string="sync">
+                    <header>
+                        <field name="sync_strategy_id" invisible="1"/>
+                        <field name="constant_simple_value" invisible="1"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="mapping_strategy"/>
+                                <field name="internal_field"/>
+                            </group>
+                            <group>
+                                <field name="key_name"/>
+                                <field name="function_name" attrs="{'invisible':[('mapping_strategy','!=','function')]}"/>
+                                <field name="constant_value_type" attrs="{'invisible':[('mapping_strategy','!=','constant')]}"/>
+                                <field name="constant_value" attrs="{'invisible':['|',('mapping_strategy','!=','constant'),('constant_simple_value','=',True)]}"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Description">
+                                <field name="description"/>
+                            </page>
+                            <page string="Script" attrs="{'invisible':[('mapping_strategy','!=','eval_script')]}">
+                                <field name="eval_script" widget="code"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="external_data_mapping_tree" model="ir.ui.view">
+            <field name="name">external.data.mapping.tree</field>
+            <field name="model">external.data.mapping</field>
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <tree>
+                    <field name="sync_strategy_id" invisible="1"/>
+                    <field name="sequence" widget="handle" />
+                    <field name="active" />
+                    <field name="name"/>
+                    <field name="internal_field"/>
+                    <field name="mapping_strategy"/>
+                    <field name="key_name"/>
+                </tree>
+            </field>
+        </record>
+    </data>
+</odoo>

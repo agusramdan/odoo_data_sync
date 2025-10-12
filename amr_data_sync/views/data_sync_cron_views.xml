@@ -138,7 +138,7 @@
         </record>
 
         <record model="ir.actions.act_window" id="external_data_sync_cron_action">
-            <field name="name">External Data Sync Cron</field>
+            <field name="name">Data Sync Cron</field>
             <field name="type">ir.actions.act_window</field>
             <field name="res_model">external.data.sync.cron</field>
             <field name="view_mode">tree,form</field>
