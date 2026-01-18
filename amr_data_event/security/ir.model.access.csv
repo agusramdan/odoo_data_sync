@@ -1,0 +1,6 @@
+id,name,model_id:id,group_id:id,perm_read,perm_write,perm_create,perm_unlink
+access_internal_data_event_user,internal.data.event User,model_internal_data_event,base.group_user,1,0,0,0
+access_internal_data_event_admin,internal.data.event Admin,model_internal_data_event,base.group_erp_manager,1,1,1,1
+
+access_internal_data_event_config_user,internal.data.event.config User,model_internal_data_event_config,base.group_user,1,0,0,0
+access_internal_data_event_config_admin,internal.data.event.config Admin,model_internal_data_event_config,base.group_erp_manager,1,1,1,1

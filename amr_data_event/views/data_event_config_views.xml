@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- FORM VIEW -->
+    <record id="view_internal_data_event_config_form" model="ir.ui.view">
+        <field name="name">internal.data.event.config.form</field>
+        <field name="model">internal.data.event.config</field>
+        <field name="arch" type="xml">
+            <form string="Internal Data Event Config">
+                <header>
+                    <field name="active" invisible="1"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="model_id" options="{'no_create': True}"/>
+                            <field name="model_name" readonly="1"/>
+                        </group>
+                    </group>
+                    <notebook>
+                        <page string="General">
+                            <group string="Log Configuration">
+                                <field name="log_create"/>
+                                <field name="log_write"/>
+                                <field name="log_unlink"/>
+                            </group>
+                        </page>
+                        <page string="Field Filter">
+                            <group string="Field Filter">
+                                <field name="fields_include"
+                                       placeholder="field1,field2,field3"/>
+                                <field name="fields_exclude"
+                                       placeholder="fieldA,fieldB"/>
+                            </group>
+                        </page>
+                    </notebook>
+
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- TREE VIEW -->
+    <record id="view_internal_data_event_config_tree" model="ir.ui.view">
+        <field name="name">internal.data.event.config.tree</field>
+        <field name="model">internal.data.event.config</field>
+        <field name="arch" type="xml">
+            <tree string="Internal Data Event Config">
+                <field name="model_id"/>
+                <field name="active"/>
+                <field name="log_create"/>
+                <field name="log_write"/>
+                <field name="log_unlink"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- ACTION -->
+    <record id="action_internal_data_event_config" model="ir.actions.act_window">
+        <field name="name">Internal Data Event Config</field>
+        <field name="res_model">internal.data.event.config</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+</odoo>
