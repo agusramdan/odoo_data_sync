@@ -10,6 +10,48 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
+def basic_auth_header(username, password, headers=None):
+    if headers is None:
+        headers = {}
+    token = f"{username}:{password}"
+    encoded = base64.b64encode(token.encode()).decode()
+    headers['Authorization'] = f"Basic {encoded}"
+    return headers
+
+
+def bearer_auth_header(access_token, headers=None):
+    if headers is None:
+        headers = {}
+    headers['Authorization'] = f'Bearer {access_token}'
+    return headers
+
+
+def request_token(token_endpoint_url, login, password, client_id=None, client_secret=None, **kwargs):
+    data = {'grant_type': 'password', 'username': login, 'password': password}
+    headers = {}
+    if client_id or client_secret:
+        headers = basic_auth_header(client_id, client_secret)
+    response = requests.post(token_endpoint_url, data=data,headers=headers)
+    response.raise_for_status()
+    json_result = response.json()
+    rest_token = json_result.get('access_token')
+    rest_refresh = json_result.get('refresh_token')
+    return rest_token, rest_refresh
+
+
+def request_refresh_token(token_endpoint_url, refresh_token, client_id=None, client_secret=None, **kwargs):
+    data = {'grant_type': 'refresh_token', 'refresh_token': refresh_token}
+    headers = {}
+    if client_id or client_secret:
+        headers = basic_auth_header(client_id, client_secret)
+    response = requests.post(token_endpoint_url, data=data, headers=headers)
+    response.raise_for_status()
+    json_result = response.json()
+    rest_token = json_result.get('access_token')
+    rest_refresh = json_result.get('refresh_token')
+    return rest_token, rest_refresh
+
+
 class ModelObject(object):
     def __init__(self, model_name, **kwargs):
 
@@ -121,31 +163,18 @@ class ModelObject(object):
         return headers
 
     def rest_bearer_header(self, headers=None):
-        if headers is None:
-            headers = {}
-        headers['Authorization'] = f'Bearer {self.ensure_token()}'
-        return headers
+        return bearer_auth_header(self.ensure_token(), headers)
 
     def rest_basic_header(self, headers=None):
-        if headers is None:
-            headers = {}
         username, password = self.get_username_password()
-        token = f"{username}:{password}"
-        encoded = base64.b64encode(token.encode()).decode()
-        headers['Authorization'] = f"Basic {encoded}"
-        return headers
+        return basic_auth_header(username, password, headers)
 
     def ensure_token(self, force=False):
         if force or self.is_token_expired():
             self.rest_post_refresh()
 
     def rest_post_refresh(self, **kwargs):
-        data = {'grant_type': 'password', 'refresh_token': self.refresh_token}
-        response = requests.post(self.get_token_endpoint_url(), data=data)
-        response.raise_for_status()
-        json_result = response.json()
-        rest_token = json_result.get('access_token')
-        rest_refresh = json_result.get('refresh_token')
+        rest_token, rest_refresh = request_refresh_token(self.get_token_endpoint_url(), self.refresh_token, **kwargs)
         if rest_token:
             self.access_token = rest_token
         if rest_refresh:

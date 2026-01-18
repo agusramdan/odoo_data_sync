@@ -181,8 +181,8 @@ class ModelObject(object):
     def external_data_callback(self, call_back):
         total = self.search_count()
         offset = 0
-        row_count = self.limit
         limit = self.limit
+        row_count = self.limit
         _logger.info("Start : get_external_data %s = total %s", self.model_name, total)
         while total and row_count == limit:
             data = self.search_read(offset=offset, limit=limit)
