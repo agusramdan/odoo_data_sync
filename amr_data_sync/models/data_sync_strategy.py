@@ -396,8 +396,8 @@ class ExternalDataSyncStrategy(models.Model):
             if k in fields_write_able and k in _fields:
                 field = _fields[k]
                 input_dict[k] = m.mapping_data(item, model=model_object, parent_data_sync=parent_object, field=field)
-
-        if self.eval_script:
+        eval_script = self.eval_script and self.eval_script.strip()
+        if eval_script:
             try:
                 eval_context = {'env': self.env, 'model': model_object, 'external_data': item, 'input_dict': input_dict}
                 # nocopy allows to return 'action'
@@ -502,14 +502,17 @@ class ExternalDataSyncStrategy(models.Model):
         config.update(self.get_auth_config())
         return config
 
-    def sync_model_object(self, **kwargs):
+    def remote_model_object(self, external_model, **kwargs):
         external_sync = self.get_external_sync()
         if external_sync == 'jsonrpc':
-            return jsonrpc.model_object(self.external_model, **kwargs)
+            return jsonrpc.model_object(external_model, **kwargs)
         elif external_sync == 'rest':
-            return jsonrpc.model_object(self.external_model, **kwargs)
+            return jsonrpc.model_object(external_model, **kwargs)
         else:
             raise NotImplementedError(f"External sync {external_sync} not implemented yet")
+
+    def sync_model_object(self, **kwargs):
+        return self.remote_model_object(self.external_model, **kwargs)
 
     def sync_list_model_object(self):
         self.ensure_one()
@@ -630,3 +633,7 @@ class ExternalDataSyncStrategy(models.Model):
         if external_id and self.internal_id_same_as_external:
             return external_id
         return None
+
+    def get_or_create_relation_from_external(self, list_of_int_or_dict, sync_related):
+        # Create for many2many or one2many
+        pass

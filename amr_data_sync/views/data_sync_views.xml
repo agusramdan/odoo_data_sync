@@ -49,6 +49,7 @@
                                 <field name="external_app_name"/>
                                 <field name="external_last_update"/>
                                 <field name="display_name"/>
+                                <field name="need_get_data_json"/>
                             </group>
                             <group>
                                 <field name="internal_odoo_id" />
@@ -79,9 +80,9 @@
                             <page string="External Data">
                                 <field name="data_json"/>
                             </page>
-<!--                            <page string="Lookup Domain Data">-->
-<!--                                <field name="lookup_domain"/>-->
-<!--                            </page>-->
+                            <page string="Payload Data">
+                                <field name="payload_json"/>
+                            </page>
                             <page string="Error Log">
                                 <field name="error_info" readonly="1"/>
                             </page>
