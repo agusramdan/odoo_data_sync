@@ -19,13 +19,15 @@ class ExternalDataSyncRelated(models.Model):
     _name = 'external.data.sync.related'
 
     external_data_sync_id = fields.Many2one(
-        'external.data.sync', ondelete='cascade'
+        'external.data.sync',
+        ondelete='cascade'
     )
     sync_strategy_id = fields.Many2one(
         'external.data.sync.strategy',
+        ondelete='set null'
     )
     external_app_name = fields.Char(related='external_data_sync_id.external_app_name')
-    name = fields.Char()
+    name = fields.Char("Field")
     internal_model = fields.Char()
     inverse_field = fields.Char(
         help='For one2many Relation'
@@ -39,8 +41,37 @@ class ExternalDataSyncRelated(models.Model):
     )
     data_json = fields.Text()
     internal_data_eval = fields.Text()
-    related_external_data_sync_id = fields.Many2one('external.data.sync', ondelete='cascade')
+    related_external_data_sync_id = fields.Many2one(
+        'external.data.sync',
+        ondelete='set null'
+    )
     mandatory_before_create = fields.Boolean()
+    next_processing_datetime = fields.Datetime()
+
+    def get_All_data_relation(self):
+        if self.env.context.get("__try_process_relation"):
+            _logger.info("Avoid recursive")
+            return
+        result = {}
+        for related in self.with_context(__try_process_relation=True):
+            value = related.get_data_relation()
+            if value:
+                result[related.name] = value
+        return result
+
+    def action_process_data(self):
+        self.try_process_data()
+
+    def try_process_data(self):
+        if self.env.context.get("__try_process_relation"):
+            _logger.info("Avoid recursive")
+            return
+        result = {}
+        for related in self.with_context(__process_relation=True, __try_process_relation=True):
+            value = related.process_data()
+            if value:
+                result[related.name] = value
+        return result
 
     def process_data(self):
         try:

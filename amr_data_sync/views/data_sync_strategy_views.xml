@@ -49,13 +49,14 @@
                                         <field name="filter_last_update"/>
                                     </group>
                                     <group>
+                                        <field name="external_company_name"/>
                                         <field name="external_domain"/>
                                         <field name="external_context"/>
 
                                         <field name="internal_lookup_fields" />
                                         <field name="internal_lookup_method" />
 
-                                        <field name="internal_call_method" attrs="{'invisible':[('external_sync','=','method_call')]}"/>
+                                        <field name="internal_call_method" attrs="{'invisible':[('external_sync','!=','method_call')]}"/>
                                     </group>
                                 </group>
                             </page>
@@ -66,7 +67,7 @@
                                         <field name="external_fields"/>
                                         <field name="parent_sync_strategy_id"/>
                                         <field name="parent_field_name" />
-                                        <field name="relation_field_ignore"/>
+                                        <field name="relation_strategy"/>
                                     </group>
                                     <group>
                                         <field name="internal_model" />

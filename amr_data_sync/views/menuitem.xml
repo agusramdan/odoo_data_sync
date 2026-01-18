@@ -29,6 +29,11 @@
               action="external_data_sync_exclude_action"
               sequence="4"
     />
+    <menuitem id="external_server_related_sync_menu"
+              parent="data_sync_parent_menu"
+              action="external_data_sync_related_action"
+              sequence="9"
+    />
     <menuitem id="external_data_sync_menu"
               parent="data_sync_parent_menu"
               action="external_data_sync_action"

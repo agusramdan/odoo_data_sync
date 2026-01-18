@@ -117,7 +117,9 @@
                     <field name="last_error"/>
                     <field name="state" />
                     <button name="action_open_internal" type="object"
-                            string="Open Internal Data" class="oe_highlight" attrs="{'invisible':[('internal_odoo_id','=',0)]}"/>
+                            string="Open Internal Data" class="oe_highlight"
+                            attrs="{'invisible':[('internal_odoo_id','=',0)]}"
+                    />
                 </tree>
             </field>
         </record>

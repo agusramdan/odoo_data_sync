@@ -1,9 +1,10 @@
 # -*- coding: utf-8 -*-
+
 from collections import defaultdict
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 from odoo.tools.safe_eval import safe_eval
-from ..tools.utils import is_callable_method, get_callable_method
+from ..tools.utils import is_callable_method, get_callable_method, convert_from_external_data
 from odoo.addons.amr_jsonrpc import jsonrpc, rest
 import ast
 import logging
@@ -27,12 +28,20 @@ class ExternalDataSyncStrategy(models.Model):
     external_domain = fields.Char()
     external_context = fields.Char()
     external_fields = fields.Char()
+
     internal_model = fields.Char()
     internal_lookup_fields = fields.Char()
     exclude_fields = fields.Char()
     after_create_fields = fields.Char(
         help="Field yang akan di proses setelah create karena kemungkin rekursif. contoh: parent_id"
     )
+    relation_strategy = fields.Selection([
+        ('ignore', 'Ignore'),
+        ('to_many_ignore', 'To Many Ignore'),
+        ('parent_ignore', 'Parent Ignore'),
+        ('to_one_ignore', 'To Ignore'),
+        ('all_process', 'All Process'),
+    ], default='parent_ignore')
     relation_field_ignore = fields.Boolean()
 
     company_id = fields.Many2one(
@@ -53,7 +62,7 @@ class ExternalDataSyncStrategy(models.Model):
         ('external_create', 'Create Only'),
         ('external_update', 'Update Only'),
     ], help="""
-    Lookup Strategy
+    Strategy
     """)
     # 'Update Only'
     internal_id_same_as_external = fields.Boolean()
@@ -96,6 +105,18 @@ class ExternalDataSyncStrategy(models.Model):
         'external.data.sync',
         ondelete='set null'
     )
+
+    def is_relation_ignore(self):
+        return self.relation_strategy == 'ignore'
+
+    def is_relation_to_many_ignore(self):
+        return self.is_relation_ignore() or self.relation_strategy == 'to_many_ignore'
+
+    def is_relation_parent_ignore(self):
+        return self.is_relation_to_many_ignore() or self.relation_strategy == 'parent_ignore'
+
+    def is_relation_to_one_ignore(self):
+        return self.is_relation_parent_ignore() or self.relation_strategy == 'to_one_ignore'
 
     def action_test_execute_eval(self, external_data, prepare_dict):
         if not self.test_external_data_sync_id:
@@ -255,16 +276,9 @@ class ExternalDataSyncStrategy(models.Model):
         return result
 
     def internal_lookup(self, item):
-        external_id = None
-        display_name = None
-        if isinstance(item, dict):
-            external_id = item.get('id')
-            display_name = item.get('display_name')
-        elif isinstance(item, list) and len(item) > 1 and isinstance(item[0], int) and isinstance(item[1], str):
-            external_id = item[0]
-            display_name = item[1]
-        elif isinstance(item, int):
-            external_id = item
+        item_data = convert_from_external_data(item)
+        external_id = item_data.get('id')
+        display_name = item_data.get('display_name')
 
         Model = self.env[self.internal_model].sudo()
         if self.strategy == 'external_update' and external_id:
@@ -297,9 +311,16 @@ class ExternalDataSyncStrategy(models.Model):
         else:
             return Model.browse()
 
-    def lookup_strategy(self, internal_model, parent_sync_strategy=None, server_sync=None, external_app_name=None):
+    def lookup_strategy(
+            self, internal_model,
+            parent_sync_strategy=None,
+            server_sync=None,
+            external_app_name=None,
+            external_model=None
+    ):
         if parent_sync_strategy:
             strategy = self.search([
+                ('external_model', '=', external_model),
                 ('internal_model', '=', internal_model),
                 ('parent_sync_strategy_id', '=', parent_sync_strategy.id),
             ], limit=1)
@@ -307,11 +328,19 @@ class ExternalDataSyncStrategy(models.Model):
 
         if not strategy and server_sync:
             strategy = self.search([
+                ('external_model', '=', external_model),
                 ('internal_model', '=', internal_model),
                 ('server_sync_id', '=', server_sync.id),
             ], limit=1)
 
             external_app_name = server_sync.get_application_name() or external_app_name
+
+        if not strategy and external_app_name:
+            strategy = self.search([
+                ('external_model', '=', external_model),
+                ('internal_model', '=', internal_model),
+                ('external_app_name', '=', external_app_name),
+            ], limit=1)
 
         if not strategy and external_app_name:
             strategy = self.search([
@@ -363,29 +392,29 @@ class ExternalDataSyncStrategy(models.Model):
                     v = fields.Date.from_string(v) if f.type == 'date' else fields.Datetime.from_string(v)
 
             input_dict[k] = v
-
         for k, m in mapping_fields.items():
             if k in fields_write_able and k in _fields:
                 field = _fields[k]
                 input_dict[k] = m.mapping_data(item, model=model_object, parent_data_sync=parent_object, field=field)
 
+        if self.eval_script:
+            try:
+                eval_context = {'env': self.env, 'model': model_object, 'external_data': item, 'input_dict': input_dict}
+                # nocopy allows to return 'action'
+                safe_eval(self.eval_script.strip(), eval_context, mode="exec", nocopy=True)
+                input_dict.update(eval_context.get('input_dict') or {})
+            except Exception as e:
+                raise ValueError(f"Error evaluating script: {e}")
+
+        # relation check
         for k, m in related_data_process_after_mapping.items():
             f, v = m
-            if input_dict.get(f.name):
+            if f.name in input_dict:
                 continue
             v = parent_object.get_related_data(f, v)
             if not v or k in after_create_fields:
                 continue
             input_dict[k] = v
-
-        if self.eval_script:
-            try:
-                eval_context = {'env': self.env, 'model': model_object, 'external_data': item}
-                # nocopy allows to return 'action'
-                safe_eval(self.eval_script.strip(), eval_context, mode="exec", nocopy=True)
-                eval_context.get('value')
-            except Exception as e:
-                raise ValueError(f"Error evaluating script: {e}")
 
         return input_dict
 
@@ -502,7 +531,6 @@ class ExternalDataSyncStrategy(models.Model):
 
         ModelObject.external_data_callback(callback)
 
-
     @api.model
     def method_call_sync_from_application_server(self):
         model = self.env[self.internal_model]
@@ -549,7 +577,6 @@ class ExternalDataSyncStrategy(models.Model):
                 eval_script,
                 eval_context, mode="exec",
                 nocopy=True,  # nocopy allows to return 'prepare'
-                filename=str(self)
             )
             return eval_context.get('prepare')
         except Exception as e:
@@ -587,3 +614,19 @@ class ExternalDataSyncStrategy(models.Model):
                 raise ValueError("found not mapped data [%s]" % str(not_mapped_ids))
 
         return result_map
+
+    def get_internal_id_same_as_external(self, item):
+        item_dict = {}
+        if isinstance(item, list):
+            if len(item) > 0:
+                item_dict['id'] = item[0]
+            if len(item) > 1:
+                item_dict['name'] = item[1]
+        elif isinstance(item, dict):
+            item_dict = item
+        external_id = item_dict.get('id')
+        if self.internal_id_offset:
+            external_id += self.internal_id_offset
+        if external_id and self.internal_id_same_as_external:
+            return external_id
+        return None

@@ -6,7 +6,7 @@ from collections import defaultdict
 
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
-from ..tools.utils import is_callable_method
+from ..tools.utils import is_callable_method, convert_from_external_data, insert_data_sql
 
 import json
 import traceback
@@ -136,7 +136,7 @@ class ExternalDataSync(models.Model):
 
     def is_all_related_done(self):
         for r in self.related_ids:
-            if r.field_after_create:
+            if not r.mandatory_before_create:
                 continue
             if r.state != 'done':
                 return False
@@ -149,9 +149,10 @@ class ExternalDataSync(models.Model):
             related.data_json = json.dumps(value)
         elif self.sync_strategy_id and value:
             parent_sync_strategy = self.sync_strategy_id
-            sync_strategy = self.sync_strategy_id.lookup_strategy(field.comodel_name,
-                                                                  parent_sync_strategy=parent_sync_strategy,
-                                                                  external_app_name=parent_sync_strategy.external_app_name)
+            sync_strategy = self.sync_strategy_id.lookup_strategy(
+                field.comodel_name, parent_sync_strategy=parent_sync_strategy,
+                external_app_name=parent_sync_strategy.external_app_name
+            )
 
             if sync_strategy and field.type == 'one2many' and isinstance(value, list) and isinstance(value[0], dict):
                 self.related_ids.create({
@@ -224,19 +225,9 @@ class ExternalDataSync(models.Model):
         return existing
 
     def relation_from_external(self, item, sync_related):
-        display_name = None
-        # item_dict = {}
-        if isinstance(item, int):
-            external_odoo_id = item
-        elif isinstance(item, list):
-            if len(item) > 0:
-                external_odoo_id = int(item[0])
-            if len(item) > 1:
-                display_name = item[1]
-        elif isinstance(item, dict):
-            # item_dict = item
-            external_odoo_id = int(item.get('id'))
-            display_name = item.get('name') or item.get('display_name')
+        item = convert_from_external_data(item)
+        external_odoo_id = int(item.get('id'))
+        display_name = item.get('name') or item.get('display_name')
 
         parent_external_data_sync = sync_related.external_data_sync_id
         internal_model = sync_related.internal_model
@@ -310,9 +301,8 @@ class ExternalDataSync(models.Model):
         if is_callable_method(model_object, 'prepare_input_dict'):
             input_dict.update(model_object.prepare_input_dict(item, input_dict=input_dict))
 
-        if sync_strategy:
-            result = sync_strategy.execute_prepare_eval(item, input_dict)
-            input_dict.update(result)
+        input_dict.update(self.related_ids.get_All_data_relation())
+
         return input_dict
 
     @api.model
@@ -331,12 +321,14 @@ class ExternalDataSync(models.Model):
 
     def write_done_internal_odoo(self, internal_odoo):
         if internal_odoo:
+            self.process_field_after_create(internal_odoo)
             self.write({
                 'internal_odoo_id': internal_odoo.id,
                 'state': 'done',
                 'last_success': fields.Datetime.now(),
                 'last_processing_datetime': fields.Datetime.now()
             })
+
         return internal_odoo
 
     def process_data(self):
@@ -366,39 +358,47 @@ class ExternalDataSync(models.Model):
                 self.write_done_internal_odoo(existing)
             else:
                 input_dict = self.prepare_input_external(item)
-
                 if self.is_all_related_done():
-                    if internal_odoo_id:
-                        existing = ModelObject.browse(internal_odoo_id)
-                    else:
-                        existing = ModelObject.browse()
-                    if existing:
-                        existing.write(input_dict)
-                    else:
-                        internal_context = self.get_internal_context()
-                        existing = ModelObject.with_context(internal_context).create([input_dict])[0]
-                    self.write_done_internal_odoo(existing)
+                    try:
+                        with self.env.cr.savepoint():
+                            if internal_odoo_id:
+                                existing = ModelObject.browse(internal_odoo_id)
+                            else:
+                                existing = ModelObject.browse()
+                            if existing:
+                                existing.write(input_dict)
+                            else:
+                                internal_context = self.get_internal_context()
+                                if sync_strategy.internal_id_same_as_external:
+                                    internal_odoo_id = sync_strategy.get_internal_id_same_as_external(item)
+                                    input_dict['id'] = internal_odoo_id
+                                    existing = \
+                                        insert_data_sql(ModelObject.with_context(internal_context), [input_dict])[0]
+                                else:
+                                    existing = ModelObject.with_context(internal_context).create([input_dict])[0]
+                            self.write_done_internal_odoo(existing)
+                    except Exception as e:
+                        self.write_error(traceback.format_exc())
                 else:
                     _logger.info("Delay proses data karena masih ada related data yang belum selesai. (%s) [%s] %s"
                                  , self.internal_model, self.external_model, self.external_odoo_id)
 
-            if self.state == 'done' and existing:
-                self.process_field_after_create(existing)
-
         except BaseException as ex:
             self._cr.rollback()
-            stack_trace = traceback.format_exc()
-            self.write({
-                'error_info': stack_trace,
-                'state': 'error',
-                'last_error': fields.Datetime.now(),
-                'last_processing_datetime': fields.Datetime.now(),
-                'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
-            })
+            self.write_error(traceback.format_exc())
         finally:
             if self.is_all_related_done() and self.state == 'process':
                 self.state = 'need_resolve'
             self._cr.commit()
+
+    def write_error(self, stack_trace):
+        self.write({
+            'error_info': stack_trace,
+            'state': 'error',
+            'last_error': fields.Datetime.now(),
+            'last_processing_datetime': fields.Datetime.now(),
+            'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
+        })
 
     def action_process_data(self):
         for rec in self:
@@ -419,7 +419,7 @@ class ExternalDataSync(models.Model):
         self.data_json = json.dumps(self.get_external_one_data())
 
     def cron_process_data(self, limit=1000):
-        limit_time = fields.Datetime.now() + datetime.timedelta(minutes=10)
+        limit_time = fields.Datetime.now() + datetime.timedelta(minutes=20)
         to_process = self.search(
             [('state', '!=', 'done'),
              '|',
@@ -432,10 +432,9 @@ class ExternalDataSync(models.Model):
                 t.write({
                     'last_processing_datetime': fields.Datetime.now(),
                 })
-                t.process_data()
-                self._cr.commit()
+                with self.env.cr.savepoint():
+                    t.process_data()
             except Exception:
-                self._cr.rollback()
                 t.write({
                     'error_info': traceback.format_exc(),
                     'state': 'error',
@@ -444,30 +443,46 @@ class ExternalDataSync(models.Model):
                 })
             if fields.Datetime.now() > limit_time:
                 break
-
+        self.env.cr.commit()
         sync_related = self.env['external.data.sync.related'].search(
-            [('state', '!=', 'done')], order='write_date,external_data_sync_id', limit=limit, )
+            [('state', '!=', 'done'),
+             '|',
+             ('next_processing_datetime', '<=', fields.Datetime.now()),
+             ('next_processing_datetime', '=', False)],
+            order='next_processing_datetime', limit=limit, )
         external_data_sync = self.browse()
-        limit_time = fields.Datetime.now() + datetime.timedelta(minutes=10)
+        limit_time = fields.Datetime.now() + datetime.timedelta(minutes=20)
         for t in sync_related:
             try:
-                t.process_data()
-                if t.state == 'done' and t.external_data_sync_id:
-                    external_data_sync |= t.external_data_sync_id
+                with self.env.cr.savepoint():
+                    t.process_data()
+                    if t.state == 'done' and t.external_data_sync_id:
+                        external_data_sync |= t.external_data_sync_id
+                    else:
+                        t.write({
+                            'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
+                        })
             except Exception:
+                t.write({
+                    #'error_info': traceback.format_exc(),
+                    #'state': 'error',
+                    #'last_error': fields.Datetime.now(),
+                    'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
+                })
                 continue
             if fields.Datetime.now() > limit_time:
                 break
-
-        limit_time = fields.Datetime.now() + datetime.timedelta(minutes=10)
+        self.env.cr.commit()
+        limit_time = fields.Datetime.now() + datetime.timedelta(minutes=20)
         for t in external_data_sync:
             try:
-                t.process_data()
+                with self.env.cr.savepoint():
+                    t.process_data()
             except Exception:
                 continue
             if fields.Datetime.now() > limit_time:
                 break
-
+        self.env.cr.commit()
         return True
 
     def get_internal_context(self):
@@ -477,7 +492,7 @@ class ExternalDataSync(models.Model):
         if self.internal_model:
             model = self.env[self.internal_model]
             if self.internal_odoo_id:
-                return model.search([('id', '=', self.internal_odoo_id)])
+                return model.browse(self.internal_odoo_id)
             return model
         return None
 
