@@ -12,8 +12,8 @@ _logger = logging.getLogger(__name__)
 
 
 class Bank(models.Model):
-    _description = 'Bank'
-    _inherit = 'res.bank'
+    _name = 'res.bank'
+    _inherit = [_name, 'internal.data.name.mixin']
 
     def lookup_internal_from_external_data(self, item, **kwargs):
         item_dict = {}

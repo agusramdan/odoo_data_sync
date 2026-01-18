@@ -10,6 +10,8 @@ from . import data_sync_strategy
 from . import data_sync_cron
 from . import data_sync_exclude
 
+from . import internal_data
+
 from . import res_bank
 from . import res_company
 from . import res_country
