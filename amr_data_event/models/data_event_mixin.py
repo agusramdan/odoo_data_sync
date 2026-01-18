@@ -17,7 +17,6 @@ EXCLUDE_MODELS = {
     'res.company',
     'res.config.settings',
     'user.delegate',
-    'antareja.token',
 
     # Messaging
     'mail.message',
@@ -57,28 +56,32 @@ class DataEventMixin(models.AbstractModel):
     def _is_excluded(self):
         return is_excluded(self._name)
 
-    @api.model_create_multi
-    @api.returns('self', lambda value: value.id)
-    def create(self, vals_list):
-        records = super(DataEventMixin, self).create(vals_list)
-
-        try:
-            records and (self._is_excluded() or self._event_light_log_create(records))
-        except Exception:
-            _logger.exception("Audit create failed")
-
-        return records
+    # @api.model_create_multi
+    # @api.returns('self', lambda value: value.id)
+    # def create(self, vals_list):
+    #     records = super(DataEventMixin, self).create(vals_list)
+    #
+    #     try:
+    #         records and (self._is_excluded() or self._event_light_log_create(records))
+    #     except Exception:
+    #         _logger.exception("Audit create failed")
+    #
+    #     return records
 
     def modified(self, fnames, create=False, before=False):
         result = super(DataEventMixin, self).modified(fnames, create, before)
-        if not self or create or before:
-            before and _logger.info("modified before" + str(fnames))
+        if not self or before:
             return result
-
-        try:
-            self._is_excluded() or self._event_light_log_modified(fnames)
-        except Exception:
-            _logger.exception("Audit write failed")
+        if create:
+            try:
+                (self._is_excluded() or self._event_light_log_create(self))
+            except Exception:
+                _logger.exception("Audit create failed")
+        else:
+            try:
+                self._is_excluded() or self._event_light_log_modified(fnames)
+            except Exception:
+                _logger.exception("Audit modified failed")
         return result
 
     def unlink(self):
