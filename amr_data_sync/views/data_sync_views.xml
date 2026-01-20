@@ -38,6 +38,7 @@
                         <button name="action_process_data" type="object" string="Process Data" class="oe_highlight"  />
                         <button name="action_process_field_after_create" type="object" string="Process After Create" class="oe_highlight"  />
                         <button name="action_open_internal" type="object" string="Open Data" class="oe_highlight" attrs="{'invisible':[('internal_odoo_id','=',0)]}" />
+                        <button name="action_build_payload" type="object" string="Build Payload" class="oe_highlight"  />
                         <field name="state" readonly="1" widget="statusbar" statusbar_visible="progress,done"/>
                     </header>
                     <sheet>

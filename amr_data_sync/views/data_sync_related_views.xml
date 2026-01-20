@@ -50,6 +50,7 @@
                             <group>
                                 <field name="sync_strategy_id"/>
                                 <field name="mandatory_before_create"/>
+                                <field name="field_after_create" />
                                 <field name="next_processing_datetime" attrs="{'invisible':[('state','=','done')]}"/>
                             </group>
                         </group>

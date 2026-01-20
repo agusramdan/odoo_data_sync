@@ -17,7 +17,9 @@ class ExternalDataLookup(models.Model):
     )
     external_model = fields.Char()
     external_id = fields.Integer()
-    external_app_name = fields.Char()
+    external_app_name = fields.Char(
+        help="""set '*' bila ingin berlaku untuk semua application"""
+    )
     internal_model = fields.Char()
     internal_id = fields.Integer()
 
@@ -38,29 +40,35 @@ class ExternalDataLookup(models.Model):
         return self and self.internal_id and self.env[self.internal_model].browse(self.internal_id)
 
     def lookup_internal(self, external_app_name, external_model, internal_model, external_id=None, display_name=None):
-        data_lookup = None
+
         if not external_app_name or not external_model or not internal_model:
             raise UserError("Invalid parameter")
 
-        domain = [
+        def lookup(domain):
+            data_lookup = None
+            if external_id and display_name:
+                data_lookup = self.search(domain + [
+                    ('external_id', '=', external_id),
+                    ('name', '=', display_name),
+                ], limit=1).get_internal_object()
+
+            if external_id and not data_lookup:
+                data_lookup = self.search(domain + [
+                    ('external_id', '=', external_id),
+                ], limit=1).get_internal_object()
+
+            if display_name and not data_lookup:
+                data_lookup = self.search(domain + [
+                    ('name', '=', display_name),
+                ], limit=1).get_internal_object()
+            return data_lookup
+
+        return lookup([
             ('external_app_name', '=', external_app_name),
             ('external_model', '=', external_model),
             ('internal_model', '=', internal_model),
-        ]
-        if external_id and display_name:
-            data_lookup = self.search(domain + [
-                ('external_id', '=', external_id),
-                ('name', '=', display_name),
-            ], limit=1).get_internal_object()
-
-        if external_id and not data_lookup:
-            data_lookup = self.search(domain + [
-                ('external_id', '=', external_id),
-            ], limit=1).get_internal_object()
-
-        if display_name and not data_lookup:
-            data_lookup = self.search(domain + [
-                ('name', '=', display_name),
-            ], limit=1).get_internal_object()
-
-        return data_lookup
+        ]) or lookup([
+            ('external_app_name', '=', '*'),
+            ('external_model', '=', external_model),
+            ('internal_model', '=', internal_model),
+        ])

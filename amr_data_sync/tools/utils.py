@@ -9,7 +9,6 @@ LOG_ACCESS_COLUMNS = ['create_uid', 'create_date', 'write_uid', 'write_date']
 
 
 def insert_data_sql(self, vals_list):
-    data_list = list()
     bad_names = {'parent_path'}
     if self._log_access:
         # the superuser can set log_access fields while loading registry
@@ -288,6 +287,6 @@ def convert_from_external_data(item):
             item_dict['id'] = item[0]
         if len(item) > 1:
             item_dict['display_name'] = item[1]
-        elif isinstance(item, dict):
-            item_dict = item
+    elif isinstance(item, dict):
+        item_dict = item
     return item_dict
