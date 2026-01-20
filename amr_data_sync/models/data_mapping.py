@@ -74,19 +74,16 @@ class ExternalDataMapping(models.Model):
             related_external_data_sync_id = self.env['external.data.sync'].get_or_create(
                 external_data, self.relation_strategy_id
             )
-            if related_external_data_sync_id:
-                if related_external_data_sync_id.internal_odoo_id:
-                    return related_external_data_sync_id.internal_odoo_id
-                if parent_data_sync:
-                    field_name = self.internal_field or self.key_name
-                    related = parent_data_sync.related_ids.get_or_create(
-                        related_external_data_sync_id, parent_data_sync, field_name, field_type='many2one',
-                        required_before_create=field and field.required
-                    )
-                    if related:
-                        return related.get_data_relation()
-                return None
-            return None
+            if parent_data_sync:
+                field_name = self.internal_field or self.key_name
+                related = parent_data_sync.related_ids.create_or_get_related(
+                    parent_data_sync, field_name, 'many2one',
+                    related_sync_strategy_id=self.relation_strategy_id,
+                    related_external_data_sync_id=related_external_data_sync_id,
+                    field_required=field and field.required
+                )
+                if related:
+                    return related.get_data_relation()
 
         elif self.mapping_strategy == 'field_mapping':
             key_name = self.key_name or self.internal_field

@@ -6,11 +6,13 @@ from collections import defaultdict
 
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
+from odoo.tools import date_utils
 from ..tools.utils import is_callable_method
 
 import json
 import traceback
 import logging
+from odoo.addons.amr_jsonrpc.utils import savepoint
 
 _logger = logging.getLogger(__name__)
 
@@ -66,19 +68,17 @@ class ExternalDataSyncRelated(models.Model):
         if self.env.context.get("__try_process_relation"):
             _logger.info("Avoid recursive")
             return
-        result = {}
         for related in self.with_context(__process_relation=True, __try_process_relation=True):
-            value = related.process_data()
-            if value:
-                result[related.name] = value
-        return result
+            related.process_data()
 
+    @savepoint
     def process_field_after_create(self):
         if self.env.context.get("__process_relation") or self.env.context.get("__process_field_after_create"):
             _logger.info(f"rekursif terdekteksi {self.name} , {self.internal_model}")
             return
-        self.with_context(__process_relation=True,__process_field_after_create=True).process_data()
+        self.with_context(__process_relation=True, __process_field_after_create=True).process_data()
 
+    @savepoint
     def process_data(self):
         try:
             if not self.data_json:
@@ -90,9 +90,16 @@ class ExternalDataSyncRelated(models.Model):
                 elif item:
                     external_data_sync = self.related_external_data_sync_id.relation_from_external(item, self)
                     self.related_external_data_sync_id = external_data_sync
-
+                    if self.related_external_data_sync_id == external_data_sync:
+                        # cirular
+                        self.internal_data_eval = str(external_data_sync.internal_odoo_id)
+                        self.state = 'done'
+                        return
+                else:
+                    return
                 if external_data_sync:
-                    if self.env.context.get("__process_relation") and external_data_sync.state != 'done' :
+                    if external_data_sync.state != 'done' and not self.field_after_create \
+                            and self.env.context.get("__process_relation"):
                         external_data_sync.process_data()
 
                     if external_data_sync.state == 'done' and external_data_sync.internal_odoo_id:
@@ -114,11 +121,9 @@ class ExternalDataSyncRelated(models.Model):
                     if self.sync_strategy_id:
                         external_data_sync_list = self.sync_strategy_id.get_or_create_relation_from_external(item, self)
                         for external_data_sync in external_data_sync_list:
-                            if external_data_sync:
-                                self.env.context.get("__process_relation") and external_data_sync.process_data()
-                                if external_data_sync.state == 'done' and external_data_sync.internal_odoo_id:
-                                    internal_ids.append(external_data_sync.internal_odoo_id)
-                                    continue
+                            if external_data_sync and external_data_sync.state == 'done' and external_data_sync.internal_odoo_id:
+                                internal_ids.append(external_data_sync.internal_odoo_id)
+                                continue
                             internal_ids.append(None)
                     if internal_ids and all(isinstance(i, int) for i in internal_ids):
                         self.internal_data_eval = str(internal_ids)
@@ -134,7 +139,7 @@ class ExternalDataSyncRelated(models.Model):
     def get_data_relation(self):
 
         if self.state != 'done':
-            self.process_data()
+            self.try_process_data()
         if self.state == 'done':
             if self.field_type == 'many2one' and self.related_external_data_sync_id:
                 return self.related_external_data_sync_id.internal_odoo_id or None
@@ -143,40 +148,104 @@ class ExternalDataSyncRelated(models.Model):
 
         return None
 
-    def get_or_create(
-            self, related_external_data_sync_id, external_data_sync_id, field_name,
-            field_type='many2one', required_before_create=False, related_sync_strategy_id=False
+    def create_or_get_related(
+            self,
+            external_data_sync_id, field_name, field_type,
+            field_required=False,
+            inverse_field=None,
+            related_sync_strategy_id=None,
+            related_external_data_sync_id=None,
+            internal_model=None,
+            value=None
     ):
         # value for this related related_external_data_sync_id
         # parent external_data_sync_id
+        if field_name=='resource_id':
+            print("ddd")
+        field_after_create = field_type in ['many2many', 'one2many']
+        update = {
+            'field_after_create': field_after_create,
+            'field_type': field_type
+        }
+
+        if related_sync_strategy_id:
+            internal_model = related_sync_strategy_id.internal_model
+            update['sync_strategy_id'] = related_sync_strategy_id.id,
+            update['internal_model'] = internal_model
+            update['field_after_create'] = external_data_sync_id.internal_model == internal_model
+        else:
+            update['internal_model'] = internal_model
+        if inverse_field:
+            update['inverse_field'] = inverse_field
+
+        if field_required:
+            update['field_after_create'] = False
+            update['mandatory_before_create'] = True
+        if value:
+            update['data_jason'] = json.dumps(value, default=date_utils.json_default)
+        if related_external_data_sync_id:
+            update['related_external_data_sync_id'] = int(related_external_data_sync_id)
         domain = [
             ('external_data_sync_id', '=', int(external_data_sync_id)),
             ('name', '=', field_name),
-            ('field_type', '=', field_type),
         ]
-        related = int(related_external_data_sync_id)
-        existing = self.search(domain + [('related_external_data_sync_id', '=', related)], limit=1)
+        existing = self.search(domain, limit=1)
         if existing:
-            return existing
-
-        existing = self.search(domain + [('related_external_data_sync_id', '=', False)], limit=1)
-        if existing:
-            existing.write({
-                'related_external_data_sync_id': related
-            })
+            existing.write(update)
             return existing
 
         create_dict = {
             'name': field_name,
-            'field_after_create': external_data_sync_id.internal_model==related_external_data_sync_id.internal_model,
-            'internal_model': related_external_data_sync_id.internal_model,
             'external_data_sync_id': int(external_data_sync_id),
-            'related_external_data_sync_id': related,
-            'field_type': field_type,
-            'required_before_create': required_before_create,
+            'state': 'draft',
         }
-
+        create_dict.update(update)
         return self.create([create_dict])[0]
+
+    # def get_or_create(
+    #         self, related_external_data_sync_id, external_data_sync_id, field_name, field_type,
+    #         inverse_field=None, required_before_create=False, related_sync_strategy_id=False,
+    #
+    # ):
+    #     # value for this related related_external_data_sync_id
+    #     # parent external_data_sync_id
+    #     if required_before_create:
+    #         field_after_create = False
+    #     elif related_sync_strategy_id:
+    #         field_after_create = external_data_sync_id.internal_model == related_sync_strategy_id.internal_model
+    #
+    #     domain = [
+    #         ('external_data_sync_id', '=', int(external_data_sync_id)),
+    #         ('name', '=', field_name),
+    #         ('field_type', '=', field_type),
+    #     ]
+    #     related = int(related_external_data_sync_id)
+    #     if related:
+    #         existing = self.search(domain + [('related_external_data_sync_id', '=', related)], limit=1)
+    #         if existing:
+    #             return existing
+    #
+    #     existing = self.search(domain + [('related_external_data_sync_id', '=', False)], limit=1)
+    #
+    #     if existing and related:
+    #         existing.write({
+    #             'related_external_data_sync_id': related
+    #         })
+    #         return existing
+    #
+    #     create_dict = {
+    #         'name': field_name,
+    #         'field_after_create': field_after_create,
+    #         'internal_model': related_external_data_sync_id.internal_model,
+    #         'external_data_sync_id': int(external_data_sync_id),
+    #         'field_type': field_type,
+    #         'inverse_field': inverse_field,
+    #         'required_before_create': required_before_create,
+    #         'related_external_data_sync_id': related or None,
+    #
+    #     }
+    #
+    #     return self.create([create_dict])[0]
 
     def internal_lookup(self, item):
         external_id = None

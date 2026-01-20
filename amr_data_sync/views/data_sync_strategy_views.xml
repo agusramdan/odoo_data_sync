@@ -45,7 +45,7 @@
                                     <group>
                                         <field name="external_sync" />
                                         <field name="sync_cron" />
-                                        <field name="company_ids"/>
+                                        <field name="company_ids" widget="many2many_tags"/>
                                         <field name="filter_company_by_name"/>
                                         <field name="external_domain"/>
                                         <field name="external_context"/>
@@ -58,6 +58,7 @@
                                         <field name="internal_lookup_fields" />
                                         <field name="internal_lookup_method" />
                                         <field name="internal_call_method" attrs="{'invisible':[('external_sync','!=','method_call')]}"/>
+                                        <field name="internal_event_sync_done"/>
                                     </group>
                                 </group>
                             </page>
@@ -75,7 +76,7 @@
                                         <field name="exclude_fields" />
                                         <field name="internal_process_method" />
                                         <field name="internal_context" />
-                                        <field name="company_id"/>
+
                                     </group>
                                 </group>
                                 <field name="line_mapping_ids" context="{'default_sync_strategy_id': active_id}">

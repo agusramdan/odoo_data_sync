@@ -5,7 +5,7 @@ from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 from odoo.tools.safe_eval import safe_eval
 from ..tools.utils import is_callable_method, get_callable_method, convert_from_external_data
-from odoo.addons.amr_jsonrpc import jsonrpc, rest
+from odoo.addons.amr_jsonrpc import jsonrpc, rest, utils
 import ast
 import logging
 
@@ -39,7 +39,7 @@ class ExternalDataSyncStrategy(models.Model):
         ('ignore', 'Ignore'),
         ('to_many_ignore', 'To Many Ignore'),
         ('parent_ignore', 'Parent Ignore'),
-        ('to_one_ignore', 'To Ignore'),
+        ('to_one_ignore', 'To One Ignore'),
         ('all_process', 'All Process'),
     ], default='parent_ignore')
     relation_field_ignore = fields.Boolean()
@@ -103,6 +103,9 @@ class ExternalDataSyncStrategy(models.Model):
     )
     internal_call_method = fields.Char(
         help="Method ini di panggil untuk option call_method"
+    )
+    internal_event_sync_done = fields.Char(
+        help="Method ini di saat sync selesai"
     )
     sync_cron = fields.Boolean()
 
@@ -283,15 +286,15 @@ class ExternalDataSyncStrategy(models.Model):
             return result[0]
         return result
 
-    def internal_lookup(self, item,):
+    def internal_lookup(self, item, ):
         item_data = convert_from_external_data(item)
         external_id = item_data.get('id')
         display_name = item_data.get('display_name')
 
         Model = self.env[self.internal_model].sudo()
         if self.internal_id_same_as_external and external_id:
-            internal_id =external_id + self.internal_id_offset
-            _logger.info("internal_id_same_as_external" )
+            internal_id = external_id + self.internal_id_offset
+            _logger.info("internal_id_same_as_external")
             return Model.with_context(active_test=False).search([('id', '=', internal_id)])
 
         if is_callable_method(Model, self.internal_lookup_method):
@@ -308,9 +311,9 @@ class ExternalDataSyncStrategy(models.Model):
             return Model.search(domain, limit=1)
 
         return self.env['external.data.lookup'].lookup_internal(
-                self.get_external_application_name(), self.external_model, self.internal_model,
-                external_id, display_name
-            )
+            self.get_external_application_name(), self.external_model, self.internal_model,
+            external_id, display_name
+        )
 
     def lookup_strategy(
             self, internal_model,
@@ -397,11 +400,14 @@ class ExternalDataSyncStrategy(models.Model):
             for k, m in mapping_fields.items():
                 if k in fields_write_able and k in _fields:
                     field = _fields[k]
-                    input_dict[k] = m.mapping_data(item, model=model_object, parent_data_sync=parent_object, field=field)
+                    input_dict[k] = m.mapping_data(
+                        item, model=model_object, parent_data_sync=parent_object,field=field
+                    )
             eval_script = self.eval_script and self.eval_script.strip()
             if eval_script:
                 try:
-                    eval_context = {'env': self.env, 'model': model_object, 'external_data': item, 'input_dict': input_dict}
+                    eval_context = {'env': self.env, 'model': model_object, 'external_data': item,
+                                    'input_dict': input_dict}
                     # nocopy allows to return 'action'
                     safe_eval(self.eval_script.strip(), eval_context, mode="exec", nocopy=True)
                     input_dict.update(eval_context.get('input_dict') or {})
@@ -454,10 +460,10 @@ class ExternalDataSyncStrategy(models.Model):
 
         if self.company_ids:
             if self.filter_company_by_name:
-                list_name =self.company_ids.mapped("name")
+                list_name = self.company_ids.mapped("name")
                 domain.append(('company_id.name', 'in', list_name))
             else:
-                domain.append(('company_id','in',self.company_ids))
+                domain.append(('company_id', 'in', self.company_ids))
 
         if self.filter_last_update:
             last_sync = self.env['external.data.sync'].get_last_sync_datetime(self)
@@ -653,4 +659,22 @@ class ExternalDataSyncStrategy(models.Model):
 
     def get_or_create_relation_from_external(self, list_of_int_or_dict, sync_related):
         # Create for many2many or one2many
-        return [self.env['external.data.sync'].data_from_external(item, self) for item in list_of_int_or_dict]
+        return [self.env['external.data.sync'].relation_from_external(item, sync_related) for item in list_of_int_or_dict]
+
+    def call_internal_process_method(self, existing, item, input_dict, data_sync):
+        if not existing or not self.internal_event_sync_done:
+            return
+        return utils.call_with_savepoint(existing, self.internal_event_sync_done, args=[item], kwargs={
+            'data_external': item,
+            'data_update': input_dict,
+            'sync_strategy': self,
+            'data_sync': data_sync
+        })
+
+    def event_external_data_sync_done(self, existing, item, input_dict):
+        if not existing or not self.internal_event_sync_done:
+            return
+        utils.call_with_savepoint(existing, self.internal_event_sync_done, kwargs={
+            'data_external': item,
+            'data_update': input_dict,
+        })

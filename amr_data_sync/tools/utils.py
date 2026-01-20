@@ -9,7 +9,6 @@ LOG_ACCESS_COLUMNS = ['create_uid', 'create_date', 'write_uid', 'write_date']
 
 
 def insert_data_sql(self, vals_list):
-    data_list = list()
     bad_names = {'parent_path'}
     if self._log_access:
         # the superuser can set log_access fields while loading registry
