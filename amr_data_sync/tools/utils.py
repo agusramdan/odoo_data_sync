@@ -288,6 +288,6 @@ def convert_from_external_data(item):
             item_dict['id'] = item[0]
         if len(item) > 1:
             item_dict['display_name'] = item[1]
-        elif isinstance(item, dict):
-            item_dict = item
+    elif isinstance(item, dict):
+        item_dict = item
     return item_dict

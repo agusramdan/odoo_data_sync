@@ -51,6 +51,11 @@ class ExternalDataSyncStrategy(models.Model):
     server_sync_id = fields.Many2one(
         'external.server.sync'
     )
+    company_ids = fields.Many2many(
+        'res.company',
+        help="Company Filter"
+    )
+    filter_company_by_name = fields.Boolean(default=True)
     filter_last_update = fields.Boolean()
     # next_sync_datetime = fields.Datetime()
     # last_sync_datetime = fields.Datetime()
@@ -246,6 +251,9 @@ class ExternalDataSyncStrategy(models.Model):
     def get_exclude_fields(self):
         exclude_fields = ['self']
         env = self.env
+        if self.exclude_fields:
+            exclude_fields.extend([p.strip() for p in self.exclude_fields.split(",")])
+
         # todo ambil dari configurasi
         exclude_fields.extend(env['mail.thread']._fields.keys())
         exclude_fields.extend(env['mail.activity.mixin']._fields.keys())
@@ -275,41 +283,34 @@ class ExternalDataSyncStrategy(models.Model):
             return result[0]
         return result
 
-    def internal_lookup(self, item):
+    def internal_lookup(self, item,):
         item_data = convert_from_external_data(item)
         external_id = item_data.get('id')
         display_name = item_data.get('display_name')
 
         Model = self.env[self.internal_model].sudo()
-        if self.strategy == 'external_update' and external_id:
-            if self.internal_id_same_as_external:
-                return Model.search([('id', '=', external_id)])
-            if self.internal_id_offset > 0:
-                return Model.search([('id', '=', external_id + self.internal_id_offset)])
+        if self.internal_id_same_as_external and external_id:
+            internal_id =external_id + self.internal_id_offset
+            _logger.info("internal_id_same_as_external" )
+            return Model.with_context(active_test=False).search([('id', '=', internal_id)])
 
-        Model = self.env[self.internal_model].sudo()
         if is_callable_method(Model, self.internal_lookup_method):
             method = getattr(Model, self.internal_lookup_method)
             return method(item, sync_strategy=self)
-
-        data_lookup = self.env['external.data.lookup'].lookup_internal(
-            self.get_external_application_name(), self.external_model, self.internal_model,
-            external_id, display_name
-        )
-
-        if data_lookup:
-            return data_lookup
 
         internal_lookup_fields = self.get_internal_lookup_fields()
         if internal_lookup_fields:
             _fields = Model._fields
             domain = []
             for f in internal_lookup_fields:
-                if f in _fields and f in item:
-                    domain.append((f, '=', item[f]))
+                if f in _fields and f in item_data:
+                    domain.append((f, '=', item_data[f]))
             return Model.search(domain, limit=1)
-        else:
-            return Model.browse()
+
+        return self.env['external.data.lookup'].lookup_internal(
+                self.get_external_application_name(), self.external_model, self.internal_model,
+                external_id, display_name
+            )
 
     def lookup_strategy(
             self, internal_model,
@@ -351,72 +352,76 @@ class ExternalDataSyncStrategy(models.Model):
         return strategy or self.browse()
 
     def prepare_input_external(self, parent_object, item, **kwargs):
-        model_object = self.env[self.internal_model]
-        _fields = model_object._fields
+        with self.env.cr.savepoint():
+            model_object = self.env[self.internal_model]
+            _fields = model_object._fields
 
-        input_dict = {}
-        include_fields = self.get_include_fields()
-        exclude_fields = self.get_exclude_fields()
-        mapping_fields = self.get_mapping_fields()
-        after_create_fields = self.get_after_create_fields()
-        exclude_fields.extend([m.key_name for m in mapping_fields.values()])
-        exclude_fields.extend(mapping_fields.keys())
+            input_dict = {}
+            include_fields = self.get_include_fields()
+            exclude_fields = self.get_exclude_fields()
+            mapping_fields = self.get_mapping_fields()
+            after_create_fields = self.get_after_create_fields()
+            exclude_fields.extend([m.key_name for m in mapping_fields.values()])
+            exclude_fields.extend(mapping_fields.keys())
 
-        fields_write_able = model_object.check_field_access_rights('write', None)
+            fields_write_able = model_object.check_field_access_rights('write', None)
 
-        related_data_process_after_mapping = {}
-        for k, v in item.items():
-            if k not in fields_write_able or k not in _fields or k in exclude_fields:
-                continue
-            f = _fields[k]
-
-            if f.compute or f.related:
-                continue
-
-            if f.type == 'boolean':
-                input_dict[k] = bool(v)
-                continue
-            if not v:
-                continue
-
-            if f.type in ['many2one', 'one2many', 'many2many']:
-                if k in include_fields:
-                    _logger.info("Process relation field %s.%s", self.internal_model, k)
-                elif not f.required and self.relation_field_ignore:
+            related_data_process_after_mapping = {}
+            for k, v in item.items():
+                if k not in fields_write_able or k not in _fields or k in exclude_fields:
                     continue
-                related_data_process_after_mapping[k] = (f, v)
-                continue
+                f = _fields[k]
 
-            elif f.type in ['date', 'datetime']:
-                if isinstance(v, str):
-                    v = fields.Date.from_string(v) if f.type == 'date' else fields.Datetime.from_string(v)
+                if f.compute or f.related:
+                    continue
 
-            input_dict[k] = v
-        for k, m in mapping_fields.items():
-            if k in fields_write_able and k in _fields:
-                field = _fields[k]
-                input_dict[k] = m.mapping_data(item, model=model_object, parent_data_sync=parent_object, field=field)
-        eval_script = self.eval_script and self.eval_script.strip()
-        if eval_script:
-            try:
-                eval_context = {'env': self.env, 'model': model_object, 'external_data': item, 'input_dict': input_dict}
-                # nocopy allows to return 'action'
-                safe_eval(self.eval_script.strip(), eval_context, mode="exec", nocopy=True)
-                input_dict.update(eval_context.get('input_dict') or {})
-            except Exception as e:
-                raise ValueError(f"Error evaluating script: {e}")
+                if f.type == 'boolean':
+                    input_dict[k] = bool(v)
+                    continue
+                if not v:
+                    continue
 
-        # relation check
-        for k, m in related_data_process_after_mapping.items():
-            f, v = m
-            if f.name in input_dict:
-                continue
-            v = parent_object.get_related_data(f, v)
-            if not v or k in after_create_fields:
-                continue
-            input_dict[k] = v
+                if f.type in ['many2one', 'one2many', 'many2many']:
+                    if k in include_fields:
+                        _logger.info("Process relation field %s.%s", self.internal_model, k)
+                    elif not f.required and self.relation_field_ignore:
+                        continue
+                    related_data_process_after_mapping[k] = (f, v)
+                    continue
 
-        return input_dict
+                elif f.type in ['date', 'datetime']:
+                    if isinstance(v, str):
+                        v = fields.Date.from_string(v) if f.type == 'date' else fields.Datetime.from_string(v)
+
+                input_dict[k] = v
+            for k, m in mapping_fields.items():
+                if k in fields_write_able and k in _fields:
+                    field = _fields[k]
+                    input_dict[k] = m.mapping_data(item, model=model_object, parent_data_sync=parent_object, field=field)
+            eval_script = self.eval_script and self.eval_script.strip()
+            if eval_script:
+                try:
+                    eval_context = {'env': self.env, 'model': model_object, 'external_data': item, 'input_dict': input_dict}
+                    # nocopy allows to return 'action'
+                    safe_eval(self.eval_script.strip(), eval_context, mode="exec", nocopy=True)
+                    input_dict.update(eval_context.get('input_dict') or {})
+                except Exception as e:
+                    raise ValueError(f"Error evaluating script: {e}")
+
+            # relation check
+            for k, m in related_data_process_after_mapping.items():
+                f, v = m
+                if f.name in input_dict:
+                    continue
+                v = parent_object.get_related_data(f, v)
+                if not v or k in after_create_fields:
+                    continue
+                input_dict[k] = v
+
+            if is_callable_method(model_object, 'prepare_input_dict'):
+                input_dict.update(model_object.prepare_input_dict(item, input_dict=input_dict))
+
+            return input_dict
 
     def sync_from_application_server(self):
         external_sync = self.get_external_sync()
@@ -446,6 +451,14 @@ class ExternalDataSyncStrategy(models.Model):
         domain = []
         if self.external_domain:
             domain = ast.literal_eval(self.external_domain) or []
+
+        if self.company_ids:
+            if self.filter_company_by_name:
+                list_name =self.company_ids.mapped("name")
+                domain.append(('company_id.name', 'in', list_name))
+            else:
+                domain.append(('company_id','in',self.company_ids))
+
         if self.filter_last_update:
             last_sync = self.env['external.data.sync'].get_last_sync_datetime(self)
             if last_sync:
@@ -501,6 +514,10 @@ class ExternalDataSyncStrategy(models.Model):
         }
         config.update(self.get_auth_config())
         return config
+
+    def internal_model_object(self):
+        if self.internal_model:
+            return self.env[self.internal_model]
 
     def remote_model_object(self, external_model, **kwargs):
         external_sync = self.get_external_sync()
@@ -636,4 +653,4 @@ class ExternalDataSyncStrategy(models.Model):
 
     def get_or_create_relation_from_external(self, list_of_int_or_dict, sync_related):
         # Create for many2many or one2many
-        pass
+        return [self.env['external.data.sync'].data_from_external(item, self) for item in list_of_int_or_dict]

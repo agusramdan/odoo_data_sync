@@ -43,19 +43,20 @@
                             <page string="Sync Data / Cron">
                                 <group>
                                     <group>
-                                        <field name="sync_cron" />
                                         <field name="external_sync" />
-                                        <field name="strategy" />
+                                        <field name="sync_cron" />
+                                        <field name="company_ids"/>
+                                        <field name="filter_company_by_name"/>
+                                        <field name="external_domain"/>
+                                        <field name="external_context"/>
                                         <field name="filter_last_update"/>
                                     </group>
                                     <group>
-                                        <field name="external_company_name"/>
-                                        <field name="external_domain"/>
-                                        <field name="external_context"/>
-
+                                        <field name="strategy" />
+                                        <field name="internal_id_same_as_external" />
+                                        <field name="internal_id_offset" attrs="{'invisible':[('internal_id_same_as_external','=',False)]}"/>
                                         <field name="internal_lookup_fields" />
                                         <field name="internal_lookup_method" />
-
                                         <field name="internal_call_method" attrs="{'invisible':[('external_sync','!=','method_call')]}"/>
                                     </group>
                                 </group>

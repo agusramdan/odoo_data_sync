@@ -73,6 +73,12 @@ class ExternalDataSyncRelated(models.Model):
                 result[related.name] = value
         return result
 
+    def process_field_after_create(self):
+        if self.env.context.get("__process_relation") or self.env.context.get("__process_field_after_create"):
+            _logger.info(f"rekursif terdekteksi {self.name} , {self.internal_model}")
+            return
+        self.with_context(__process_relation=True,__process_field_after_create=True).process_data()
+
     def process_data(self):
         try:
             if not self.data_json:
@@ -83,15 +89,16 @@ class ExternalDataSyncRelated(models.Model):
                     external_data_sync = self.related_external_data_sync_id
                 elif item:
                     external_data_sync = self.related_external_data_sync_id.relation_from_external(item, self)
+                    self.related_external_data_sync_id = external_data_sync
+
                 if external_data_sync:
-                    self.env.context.get(
-                        "__process_relation") and external_data_sync.state != 'done' and external_data_sync.process_data()
+                    if self.env.context.get("__process_relation") and external_data_sync.state != 'done' :
+                        external_data_sync.process_data()
+
                     if external_data_sync.state == 'done' and external_data_sync.internal_odoo_id:
                         self.internal_data_eval = str(external_data_sync.internal_odoo_id)
                         self.state = 'done'
                         return
-                    elif not self.related_external_data_sync_id:
-                        self.related_external_data_sync_id = external_data_sync
                 elif item:
                     # using data lookup
                     data = self.internal_lookup(item)
@@ -161,7 +168,7 @@ class ExternalDataSyncRelated(models.Model):
 
         create_dict = {
             'name': field_name,
-            'field_after_create': True,
+            'field_after_create': external_data_sync_id.internal_model==related_external_data_sync_id.internal_model,
             'internal_model': related_external_data_sync_id.internal_model,
             'external_data_sync_id': int(external_data_sync_id),
             'related_external_data_sync_id': related,
