@@ -510,6 +510,8 @@ class ExternalDataSyncStrategy(models.Model):
         fields_list = None
         if self.external_fields:
             fields_list = self.get_external_fields()
+            if fields_list and 'write_date' not in fields_list:
+                fields_list.append('write_date')
         endpoint_url = self.get_endpoint_url()
         # todo fix
         config = {
@@ -662,9 +664,9 @@ class ExternalDataSyncStrategy(models.Model):
         return [self.env['external.data.sync'].relation_from_external(item, sync_related) for item in list_of_int_or_dict]
 
     def call_internal_process_method(self, existing, item, input_dict, data_sync):
-        if not existing or not self.internal_event_sync_done:
-            return
-        return utils.call_with_savepoint(existing, self.internal_event_sync_done, args=[item], kwargs={
+        if not isinstance(existing, models.BaseModel) or not self.internal_process_method:
+            return existing
+        return utils.call_with_savepoint(existing, self.internal_process_method, kwargs={
             'data_external': item,
             'data_update': input_dict,
             'sync_strategy': self,
@@ -672,8 +674,8 @@ class ExternalDataSyncStrategy(models.Model):
         })
 
     def event_external_data_sync_done(self, existing, item, input_dict):
-        if not existing or not self.internal_event_sync_done:
-            return
+        if not isinstance(existing, models.BaseModel) or not self.internal_event_sync_done:
+            return existing
         utils.call_with_savepoint(existing, self.internal_event_sync_done, kwargs={
             'data_external': item,
             'data_update': input_dict,

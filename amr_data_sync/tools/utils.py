@@ -2,7 +2,8 @@ from collections import defaultdict
 
 from psycopg2._psycopg import AsIs
 import inspect
-from odoo import SUPERUSER_ID
+from odoo import SUPERUSER_ID,_
+from odoo.exceptions import UserError
 from odoo.tools import clean_context, attrgetter
 
 LOG_ACCESS_COLUMNS = ['create_uid', 'create_date', 'write_uid', 'write_date']
@@ -229,8 +230,8 @@ def safe_call_method(obj, method_name, args=None, kwargs=None):
 
     final_args = []
     final_kwargs = {}
-    kwargs = kwargs or {}
-    args = args or []
+    kwargs = dict(kwargs or {})
+    args = list(args or [])
     for name, p in params.items():
         if p.kind in (
                 inspect.Parameter.POSITIONAL_ONLY,
@@ -241,6 +242,7 @@ def safe_call_method(obj, method_name, args=None, kwargs=None):
                 args = args[1:]
             elif name in kwargs:
                 final_args.append(kwargs[name])
+                kwargs.pop(name)
             elif p.default is not inspect.Parameter.empty:
                 pass
             else:
@@ -290,3 +292,52 @@ def convert_from_external_data(item):
     elif isinstance(item, dict):
         item_dict = item
     return item_dict
+
+
+def ensure_external_fields(self, model_name):
+    # heleper to setup external fields for model line (not for main model)
+    IrModel = self.env['ir.model']
+    IrModelFields = self.env['ir.model.fields']
+
+    model = IrModel.search([('model', '=', model_name)], limit=1)
+    if not model:
+        raise UserError(_('Model %s not found') % model_name)
+
+    fields_to_create = [
+        {
+            'name': 'x_external_app_name',
+            'field_description': 'External App Name',
+            'ttype': 'char',
+        },
+        {
+            'name': 'x_external_model',
+            'field_description': 'External Model',
+            'ttype': 'char',
+        },
+        {
+            'name': 'x_external_odoo_id',
+            'field_description': 'External Odoo ID',
+            'ttype': 'integer',
+        },
+    ]
+
+    created_fields = []
+
+    for field_def in fields_to_create:
+        existing = IrModelFields.search([
+            ('name', '=', field_def['name']),
+            ('model_id', '=', model.id),
+        ], limit=1)
+
+        if existing:
+            continue
+
+        field_def.update({
+            'model_id': model.id,
+            'state': 'manual',
+            'store': True,
+        })
+
+        created_fields.append(IrModelFields.create(field_def))
+
+    return created_fields
