@@ -92,15 +92,18 @@ class ModelObject(object):
         data.update(overrides)
         return ModelObject(self.model_name, **data)
 
+    def call(self, method, args, kw=None):
+        url, db, uid, password = self.get_url_db_uid_password()
+        return execute_kw(
+            url, self.model_name, method, args=args, kw=kw, db=db, uid=uid, password=password
+        )
+
     def __getattr__(self, method):
         def delegate_func(*args, **kw):
             args = list(args)
-            if self.ids is not None:
+            if self.ids:
                 args = [self.ids] + args
-            url, db, uid, password = self.get_url_db_uid_password()
-            return execute_kw(
-                url, self.model_name, method, args=args, kw=kw, db=db, uid=uid, password=password
-            )
+            return self.call(method, args, kw=kw)
 
         return delegate_func
 
@@ -142,7 +145,6 @@ class ModelObject(object):
         return self
 
     def search_read(self, domain=None, fields=None, offset=0, limit=None, order=None):
-        model_name = self.model_name
         method = 'search_read'
         args = []
         kw = {
@@ -150,33 +152,23 @@ class ModelObject(object):
             'fields': fields or self.fields, 'order': order or self.order,
             'offset': offset or self.offset, 'limit': limit or self.limit,
         }
-        url, db, uid, password = self.get_url_db_uid_password()
-        return execute_kw(
-            url, model_name, method, args=args, kw=kw, db=db, uid=uid, password=password
-        )
+        return self.call(method, args, kw=kw)
 
-    def read(self, fields=None, _id=None):
-        if not _id and self.ids and isinstance(self.ids, (list, tuple)):
-            _id = self.ids[0]
-        if not _id:
-            raise Exception("No _id can not call read")
-        model_name = self.model_name
+    def read(self, *args, fields=None):
+        # if not _id and self.ids and isinstance(self.ids, (list, tuple)):
+        #     _id = self.ids[0]
+        # if not _id:
+        #     raise Exception("No _id can not call read")
         method = 'read'
-        args = [[_id]]
+        if not args and self.ids and isinstance(self.ids, (list, tuple)):
+            args = self.ids
         kw = {'fields': fields or self.fields}
-        url, db, uid, password = self.get_url_db_uid_password()
-        return execute_kw(
-            url, model_name, method, args=args, kw=kw, db=db, uid=uid, password=password
-        )
+        return self.call(method, args, kw=kw)
 
     def search_count(self):
-        model_name = self.model_name
         method = 'search_count'
         args = [self.domain or []]
-        url, db, uid, password = self.get_url_db_uid_password()
-        return execute_kw(
-            url, model_name, method, args=args, db=db, uid=uid, password=password
-        )
+        return self.call(method, args=args)
 
     def external_data_callback(self, call_back):
         total = self.search_count()
