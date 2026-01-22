@@ -8,11 +8,11 @@ from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 from odoo.tools import date_utils
 from ..tools.utils import is_callable_method
+from odoo.addons.amr_jsonrpc.utils import savepoint
 
 import json
 import traceback
 import logging
-from odoo.addons.amr_jsonrpc.utils import savepoint
 
 _logger = logging.getLogger(__name__)
 
