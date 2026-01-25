@@ -57,10 +57,10 @@ def call_with_savepoint(self, method_name, args=None, kwargs=None, logger=_logge
     """
 
     if not isinstance(self, models.BaseModel):
-        return self
+        return None
 
     if not method_name or not isinstance(method_name, str):
-        return self
+        return None
 
     if not hasattr(self, method_name):
         raise AttributeError(f"Method {method_name} not found")
@@ -111,4 +111,4 @@ def call_with_savepoint(self, method_name, args=None, kwargs=None, logger=_logge
         logger.warning("[SAFEPOINT] %s failed: %s", method_name, e, exc_info=True)
         if rethrow:
             raise
-    return self
+    return None
