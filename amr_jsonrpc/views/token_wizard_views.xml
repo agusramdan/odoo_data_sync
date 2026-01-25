@@ -1,0 +1,40 @@
+<!-- views/token_wizard_view.xml -->
+<odoo>
+    <record id="view_get_token_wizard_form" model="ir.ui.view">
+        <field name="name">amr.get.token.wizard.form</field>
+        <field name="model">amr.get.token.wizard</field>
+        <field name="arch" type="xml">
+            <form string="Get Token">
+                <group>
+                    <field name="url"/>
+                    <field name="username"/>
+                    <field name="password" password="True"/>
+                </group>
+
+                <group attrs="{'invisible': [('access_token', '=', False)]}">
+                    <field name="access_token" readonly="1"/>
+                    <field name="refresh_token" readonly="1"/>
+                    <field name="expires_at" readonly="1"/>
+                    <field name="message" readonly="1"/>
+                </group>
+
+                <footer>
+                    <button string="Get Token"
+                            type="object"
+                            name="action_get_token"
+                            class="btn-primary"/>
+                    <button string="Cancel"
+                            class="btn-secondary"
+                            special="cancel"/>
+                </footer>
+            </form>
+        </field>
+    </record>
+
+    <record id="action_get_token_wizard" model="ir.actions.act_window">
+        <field name="name">Get Token</field>
+        <field name="res_model">amr.get.token.wizard</field>
+        <field name="view_mode">form</field>
+        <field name="target">new</field>
+    </record>
+</odoo>

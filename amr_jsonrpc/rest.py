@@ -9,6 +9,110 @@ import logging
 
 _logger = logging.getLogger(__name__)
 
+import json
+import base64
+from odoo.fields import Datetime, Date
+from datetime import date, datetime
+from decimal import Decimal
+from uuid import UUID
+
+
+class OdooJSONEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, (bytes, bytearray)):
+            return base64.b64encode(obj).decode()
+        if isinstance(obj, datetime):
+            return Datetime.to_string(obj)
+        if isinstance(obj, date):
+            return Date.to_string(obj)
+
+        if isinstance(obj, Decimal):
+            return float(obj)
+        if isinstance(obj, UUID):
+            return str(obj)
+        return super().default(obj)
+
+
+class OdooRestClient:
+
+    def __init__(self, base_url: str):
+        self.base_url = base_url and base_url.rstrip('/') or ""
+        self.session = requests.Session()
+        self.session.headers.update({
+            "Content-Type": "application/json"
+        })
+
+    def post(self, path, json=None, params=None, headers=None):
+        url = f"{self.base_url}{path}"
+        return self.session.post(
+            url,
+            json=json,
+            params=params,
+            headers=headers
+        )
+
+    def get(self, path, params=None, headers=None):
+        url = f"{self.base_url}{path}"
+        return self.session.get(
+            url,
+            params=params,
+            headers=headers
+        )
+
+
+class OdooSessionAuth:
+
+    def __init__(self, client):
+        self.client = client
+
+    def login(self, db: str, login: str, password: str):
+        payload = {
+            "jsonrpc": "2.0",
+            "params": {
+                "db": db,
+                "login": login,
+                "password": password
+            }
+        }
+
+        resp = self.client.post(
+            "/web/session/authenticate",
+            json=payload
+        )
+        resp.raise_for_status()
+
+        # session_id otomatis tersimpan di session.cookies
+        return resp.json()
+
+
+from requests.auth import HTTPBasicAuth
+
+
+class BasicAuth:
+    def apply(self, client: OdooRestClient, username, password):
+        client.session.auth = HTTPBasicAuth(username, password)
+
+
+class BearerAuth:
+    def apply(self, client: OdooRestClient, token: str):
+        client.session.headers.update({
+            "Authorization": f"Bearer {token}"
+        })
+
+
+class HeaderTokenAuth:
+    def apply(self, client: OdooRestClient, header_name, token):
+        client.session.headers.update({
+            header_name: token
+        })
+
+
+class ParamTokenAuth:
+    def with_token(self, params: dict, param_name: str, token: str):
+        params = params or {}
+        params[param_name] = token
+        return params
+
 
 def basic_auth_header(username, password, headers=None):
     if headers is None:
@@ -31,7 +135,7 @@ def request_token(token_endpoint_url, login, password, client_id=None, client_se
     headers = {}
     if client_id or client_secret:
         headers = basic_auth_header(client_id, client_secret)
-    response = requests.post(token_endpoint_url, data=data,headers=headers)
+    response = requests.post(token_endpoint_url, data=data, headers=headers)
     response.raise_for_status()
     json_result = response.json()
     rest_token = json_result.get('access_token')
