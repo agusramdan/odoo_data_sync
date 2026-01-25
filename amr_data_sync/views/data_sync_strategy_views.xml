@@ -36,29 +36,28 @@
                             <group>
 <!--                                <field name="name"/>-->
                                 <field name="server_sync_id"/>
-                                <field name="external_app_name"/>
+                                <field name="external_app_name" attrs="{'readonly': [('server_sync_id','!=',False)]}"/>
                             </group>
                         </group>
                         <notebook>
                             <page string="Sync Data / Cron">
                                 <group>
-                                    <group>
-                                        <field name="external_sync" />
+                                    <group string="External">
+<!--                                        <field name="external_sync" />-->
+<!--                                        <field name="internal_call_method" attrs="{'invisible':[('external_sync','!=','method_call')]}"/>-->
+                                        <field name="strategy" />
                                         <field name="sync_cron" />
                                         <field name="company_ids" widget="many2many_tags"/>
-                                        <field name="filter_company_by_name"/>
                                         <field name="external_domain"/>
                                         <field name="external_context"/>
                                         <field name="filter_last_update"/>
                                     </group>
-                                    <group>
-                                        <field name="strategy" />
-                                        <field name="internal_id_same_as_external" />
-                                        <field name="internal_id_offset" attrs="{'invisible':[('internal_id_same_as_external','=',False)]}"/>
-                                        <field name="internal_lookup_fields" />
-                                        <field name="internal_lookup_method" />
-                                        <field name="internal_call_method" attrs="{'invisible':[('external_sync','!=','method_call')]}"/>
-                                        <field name="internal_event_sync_done"/>
+                                    <group string="Internal">
+                                        <field name="internal_id_same_as_external" string="Id Same As Ext."/>
+                                        <field name="internal_id_offset" string="Offset External Id" attrs="{'invisible':[('internal_id_same_as_external','=',False)]}"/>
+                                        <field name="internal_lookup_fields" string="Lookup by Fields"/>
+                                        <field name="internal_lookup_method" string="Lookup using Method"/>
+                                        <field name="internal_event_sync_done" string="Done event Method"/>
                                     </group>
                                 </group>
                             </page>
@@ -67,16 +66,15 @@
                                     <group>
                                         <field name="external_model"/>
                                         <field name="external_fields"/>
-                                        <field name="parent_sync_strategy_id"/>
-                                        <field name="parent_field_name" />
-                                        <field name="relation_strategy"/>
+                                        <field name="parent_sync_strategy_id"  attrs="{'invisible':[('sync_cron','=',True)]}"/>
+                                        <field name="parent_field_name" attrs="{'invisible':[('sync_cron','=',True)]}"/>
+<!--                                        <field name="relation_strategy"/>-->
                                     </group>
                                     <group>
                                         <field name="internal_model" />
                                         <field name="exclude_fields" />
                                         <field name="internal_process_method" />
                                         <field name="internal_context" />
-
                                     </group>
                                 </group>
                                 <field name="line_mapping_ids" context="{'default_sync_strategy_id': active_id}">
@@ -94,13 +92,13 @@
                                         />
                                     </tree>
                                 </field>
-                                <field name="line_sync_strategy_ids" readonly="1">
-                                    <tree>
-                                        <field name="parent_field_name"/>
-                                        <field name="external_model"/>
-                                        <field name="internal_model"/>
-                                    </tree>
-                                </field>
+<!--                                <field name="line_sync_strategy_ids" readonly="1">-->
+<!--                                    <tree>-->
+<!--                                        <field name="parent_field_name"/>-->
+<!--                                        <field name="external_model"/>-->
+<!--                                        <field name="internal_model"/>-->
+<!--                                    </tree>-->
+<!--                                </field>-->
                             </page>
                             <page string="Script" attrs="{'invisible':[('internal_process_method','!=',False)]}">
                                 <group>

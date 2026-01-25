@@ -190,7 +190,7 @@ class ExternalDataSync(models.Model):
         existing = self.search(domain, limit=1)
         if existing:
             if external_last_update and existing.external_last_update and existing.internal_odoo_id:
-                if existing.external_last_update >= external_last_update :
+                if existing.external_last_update >= external_last_update:
                     _logger.info("Data tidak perlu di update karena data lebih baru atau sama.")
                 return existing
 
@@ -250,7 +250,8 @@ class ExternalDataSync(models.Model):
     @savepoint(rethrow=True)
     def prepare_input_external(self, item, **kwargs):
         parent_object = self
-        input_dict = self.sync_strategy_id.prepare_input_external(parent_object, item, **kwargs)
+        sync_strategy = kwargs.get('sync_strategy') or self.sync_strategy_id
+        input_dict = sync_strategy.prepare_input_external(parent_object, item, **kwargs)
         input_dict.update(self.related_ids.get_All_data_relation() or {})
         return input_dict
 
@@ -326,6 +327,7 @@ class ExternalDataSync(models.Model):
     @savepoint
     def process_data(self):
         all_related_done = False
+        input_dict = {}
         try:
             # try with exception
             with self.env.cr.savepoint():
@@ -357,34 +359,44 @@ class ExternalDataSync(models.Model):
                         })
                     return
 
-                input_dict = self.prepare_input_external(item)
+                input_dict = self.prepare_input_external(item, sync_strategy=sync_strategy)
                 existing = sync_strategy.call_internal_process_method(existing, item, input_dict, self) or existing
                 all_related_done = self.is_all_related_done()
                 if all_related_done:
                     existing = self.save_data(existing, item, input_dict) or existing
+                    self.write_done_internal_odoo(existing, input_dict)
                 else:
                     _logger.info("Delay proses data karena masih ada related data yang belum selesai. (%s) [%s] %s",
                                  self.internal_model, self.external_model, self.external_odoo_id)
 
-                sync_strategy.event_external_data_sync_done(existing, item, input_dict)
 
         except Exception as ex:
             all_related_done = False
             # todo clear cache odoo
-            self.write_error(traceback.format_exc())
+            self.write_error(traceback.format_exc(), input_dict)
         finally:
             if all_related_done and self.state == 'process':
                 self.state = 'need_resolve'
 
+        if existing and all_related_done:
+            after_data = self.process_field_after_create(existing) or {}
+            if after_data:
+                input_dict.update(after_data)
+                self.write_done_internal_odoo(existing, input_dict)
+            sync_strategy.event_external_data_sync_done(existing, item, input_dict)
+
     @savepoint
-    def write_error(self, stack_trace):
-        self.write({
+    def write_error(self, stack_trace, payload=None):
+        error_data = {
             'error_info': stack_trace,
             'state': 'error',
             'last_error': fields.Datetime.now(),
             'last_processing_datetime': fields.Datetime.now(),
             'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
-        })
+        }
+        if payload:
+            error_data['payload_json'] = json.dumps(payload, default=date_utils.json_default)
+        self.write(error_data)
 
     def action_process_data(self):
         for rec in self:
@@ -570,33 +582,44 @@ class ExternalDataSync(models.Model):
             external_model=None,
             raise_not_found_exception=True
     ):
+        # return result_map(int:internal_id,list():external_id), not_mapped_ids(int:internal)
         # digunakan untuk mengirim data ke server external
         if not internal:
-            return [0]
+            return [0], [0]
 
         if not isinstance(internal, models.BaseModel):
             _logger.error("Internal Object must")
             if raise_not_found_exception:
                 raise ValueError("Internal Object must")
-            return [0]
+            return [0], [0]
 
         if sync_strategy:
-            return sync_strategy.reverse_mapping(internal, raise_not_found_exception=raise_not_found_exception)
+            result_map, not_mapped_ids = sync_strategy.reverse_mapping(internal, raise_not_found_exception=False)
+            if not not_mapped_ids:
+                return result_map, not_mapped_ids
+            internal_model = sync_strategy.internal_model
+            external_app_name = sync_strategy.get_external_application_name()
+            external_model = sync_strategy.external_model or internal_model
+        else:
+            internal_model = internal._name
+            result_map, not_mapped_ids = {}, set(internal.ids)
 
         if not external_app_name:
             _logger.error("external_app_name not set")
             if raise_not_found_exception:
                 raise ValueError("external_app_name not set")
-            return [0]
-
+            return result_map, not_mapped_ids
         if not external_model:
-            _logger.error("external_model not set")
-            if raise_not_found_exception:
-                raise ValueError("external_model not set")
-            return [0]
+            if internal_model:
+                external_model = internal_model
+            else:
+                _logger.error("external_model not set")
+                if raise_not_found_exception:
+                    raise ValueError("external_model not set")
+                return result_map, not_mapped_ids
 
-        domain = [('internal_odoo_id', 'in', internal.ids), ('external_app_name', '=', external_app_name),
-                  ('external_model', '=', external_model), ('internal_model', '=', internal._name)]
+        domain = [('internal_odoo_id', 'in', list(not_mapped_ids)), ('internal_model', '=', internal_model),
+                  ('external_app_name', '=', external_app_name), ('external_model', '=', external_model), ]
 
         rows = self.search_read(
             domain,
@@ -607,15 +630,32 @@ class ExternalDataSync(models.Model):
         for r in rows:
             mapping[r['internal_odoo_id']].append(r['external_odoo_id'])
 
-        result_map = dict(mapping)
+        result_map.update(dict(mapping))
+        not_mapped_ids -= result_map.keys()
 
-        not_mapped_ids = set(internal.ids) - result_map.keys()
+        if not not_mapped_ids:
+            return result_map, not_mapped_ids
+
+        domain = [('internal_id', 'in', list(not_mapped_ids)), ('internal_model', '=',internal_model),
+                  ('external_app_name', '=', external_app_name), ('external_model', '=', external_model),
+                  ('reverse_able', '=', True), ]
+
+        rows = self.env['external.data.lookup'].search_read(
+            domain,
+            fields=['internal_id', 'external_id']
+        )
+        mapping = defaultdict(list)
+        for r in rows:
+            mapping[r['internal_id']].append(r['external_id'])
+
+        result_map.update(dict(mapping))
+
         if not_mapped_ids:
             _logger.error("found not mapped data")
             if raise_not_found_exception:
                 raise ValueError("found not mapped data [%s]" % str(not_mapped_ids))
 
-        return result_map
+        return result_map, not_mapped_ids
 
     @api.model
     def ensure_external_data(self, external_data):

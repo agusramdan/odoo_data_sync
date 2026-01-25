@@ -38,9 +38,10 @@ class ExternalDataSyncRelated(models.Model):
     field_type = fields.Selection(
         [('many2one', 'Many2one'), ('one2many', 'One2many'), ('many2many', 'Many2many')],
     )
-    state = fields.Selection(
-        [('draft', 'Draft'), ('process', 'Process'), ('error', 'Error'), ('done', 'Done'), ]
-    )
+    state = fields.Selection([
+        ('draft', 'Draft'), ('process', 'Process'), ('need_resolve', 'Need Resolve'),
+        ('error', 'Error'), ('done', 'Done'),
+    ])
     data_json = fields.Text()
     internal_data_eval = fields.Text()
     related_external_data_sync_id = fields.Many2one(
@@ -97,14 +98,23 @@ class ExternalDataSyncRelated(models.Model):
                         return
                 else:
                     return
+
                 if external_data_sync:
-                    if external_data_sync.state != 'done' and not self.field_after_create \
+                    if external_data_sync.state != 'done' \
+                            and not self.field_after_create \
                             and self.env.context.get("__process_relation"):
                         external_data_sync.process_data()
+                    # bila sudah punya internal id bisa langsung di relasikan tidak perlu menunggu done
+                    if external_data_sync.internal_odoo_id:
+                        if self.state == 'done':
+                            state = 'done'
+                        else:
+                            state = 'need_resolve'
 
-                    if external_data_sync.state == 'done' and external_data_sync.internal_odoo_id:
-                        self.internal_data_eval = str(external_data_sync.internal_odoo_id)
-                        self.state = 'done'
+                        self.write({
+                            'state': state,
+                            'internal_data_eval': str(external_data_sync.internal_odoo_id),
+                        })
                         return
                 elif item:
                     # using data lookup
@@ -112,22 +122,34 @@ class ExternalDataSyncRelated(models.Model):
                     if data:
                         self.internal_data_eval = str(data.id)
                         self.state = 'done'
+
             elif item:
                 if self.field_type in ['many2many', 'one2many']:
                     # pada tuple command ditambahkan informasi external id
                     if not item:
                         return
                     internal_ids = []
+                    state = 'done'
                     if self.sync_strategy_id:
                         external_data_sync_list = self.sync_strategy_id.get_or_create_relation_from_external(item, self)
                         for external_data_sync in external_data_sync_list:
-                            if external_data_sync and external_data_sync.state == 'done' and external_data_sync.internal_odoo_id:
+                            if external_data_sync and external_data_sync.internal_odoo_id:
                                 internal_ids.append(external_data_sync.internal_odoo_id)
+                                if external_data_sync.state != 'done':
+                                    state = 'need_resolve'
                                 continue
                             internal_ids.append(None)
                     if internal_ids and all(isinstance(i, int) for i in internal_ids):
-                        self.internal_data_eval = str(internal_ids)
-                        self.state = 'done'
+                        self.write({
+                            'state': state,
+                            'internal_data_eval': str(internal_ids),
+                        })
+                    else:
+                        self.write({
+                            'state': 'process',
+                            'internal_data_eval': None,
+                        })
+
         except Exception:
             stack_trace = traceback.format_exc()
             self.write({
@@ -160,7 +182,7 @@ class ExternalDataSyncRelated(models.Model):
     ):
         # value for this related related_external_data_sync_id
         # parent external_data_sync_id
-        if field_name=='resource_id':
+        if field_name == 'resource_id':
             print("ddd")
         field_after_create = field_type in ['many2many', 'one2many']
         update = {

@@ -23,7 +23,10 @@ class ExternalDataSyncStrategy(models.Model):
         help="If unchecked, it will allow you to hide the record without removing it."
     )
     external_model = fields.Char()
-    external_app_name = fields.Char()
+    external_app_name = fields.Char(
+        compute='_compute_external_app_name',
+        inverse='_inverse_external_app_name',
+        store=True)
     external_company_name = fields.Char()
     external_domain = fields.Char()
     external_context = fields.Char()
@@ -43,13 +46,13 @@ class ExternalDataSyncStrategy(models.Model):
         ('all_process', 'All Process'),
     ], default='parent_ignore')
     relation_field_ignore = fields.Boolean()
-
+    # company_id deprecated
     company_id = fields.Many2one(
         'res.company',
         help="Default Company"
     )
     server_sync_id = fields.Many2one(
-        'external.server.sync'
+        'external.server.sync', ondelete='set null'
     )
     company_ids = fields.Many2many(
         'res.company',
@@ -113,6 +116,21 @@ class ExternalDataSyncStrategy(models.Model):
         'external.data.sync',
         ondelete='set null'
     )
+
+    # ===== COMPUTE =====
+    @api.depends('server_sync_id', 'server_sync_id.app_name')
+    def _compute_external_app_name(self):
+        for rec in self:
+            if rec.server_sync_id:
+                rec.external_app_name = rec.server_sync_id.app_name
+            # kalau server_sync_id kosong → JANGAN override
+            # biarkan nilai manual tetap
+
+    # ===== INVERSE =====
+    def _inverse_external_app_name(self):
+        for rec in self:
+            # inverse wajib ada supaya field editable
+            pass
 
     def is_relation_ignore(self):
         return self.relation_strategy == 'ignore'
@@ -401,7 +419,7 @@ class ExternalDataSyncStrategy(models.Model):
                 if k in fields_write_able and k in _fields:
                     field = _fields[k]
                     input_dict[k] = m.mapping_data(
-                        item, model=model_object, parent_data_sync=parent_object,field=field
+                        item, model=model_object, parent_data_sync=parent_object, field=field
                     )
             eval_script = self.eval_script and self.eval_script.strip()
             if eval_script:
@@ -436,16 +454,10 @@ class ExternalDataSyncStrategy(models.Model):
         else:
             self.sync_list_model_object()
 
-    def get_db_uid_username_password(self):
-        return self.server_sync_id.get_db_uid_username_password()
-
-    def jsonrpc_endpoint_url(self):
-        return self.server_sync_id.jsonrpc_endpoint_url()
+    # def get_db_uid_username_password(self):
+    #     return self.server_sync_id.get_db_uid_username_password()
 
     def get_endpoint_url(self):
-        external_sync = self.get_external_sync()
-        if external_sync == 'jsonrpc':
-            return self.jsonrpc_endpoint_url()
         return self.server_sync_id.get_endpoint_url()
 
     def prepare_sync_list_dict(self):
@@ -459,11 +471,25 @@ class ExternalDataSyncStrategy(models.Model):
             domain = ast.literal_eval(self.external_domain) or []
 
         if self.company_ids:
-            if self.filter_company_by_name:
-                list_name = self.company_ids.mapped("name")
-                domain.append(('company_id.name', 'in', list_name))
-            else:
-                domain.append(('company_id', 'in', self.company_ids))
+            # reverse id untuk company supaya filter lebih mudah.
+            mapped_ids, not_mapped_ids = self.env['external.data.company'].reverse_mapping(
+                self.company_ids, external_app_name=self.get_external_application_name(),
+                server_sync=self.server_sync_id
+            )
+            # result_map, not_mapped_ids
+            external_company_ids = [item for sublist in mapped_ids.values() for item in sublist]
+            external_company_names = []
+            for rec in self.company_ids:
+                if rec.id in not_mapped_ids:
+                    external_company_names.append(rec.name)
+            if external_company_ids and external_company_names:
+                domain.extend(
+                    ['|', ('company_id', 'in', external_company_ids), ('company_id.name', 'in', external_company_names)]
+                )
+            elif external_company_ids:
+                domain.append(('company_id', 'in', external_company_ids))
+            elif external_company_names:
+                domain.append(('company_id.name', 'in', external_company_names))
 
         if self.filter_last_update:
             last_sync = self.env['external.data.sync'].get_last_sync_datetime(self)
@@ -472,9 +498,7 @@ class ExternalDataSyncStrategy(models.Model):
                 domain = [('write_date', '>=', last_sync.strftime('%Y-%m-%d %H:%M:%S'))] + domain
 
         fields_list = ['display_name', 'name', 'write_date', 'id'] + self.get_internal_lookup_fields()
-        endpoint_url = self.get_endpoint_url()
         config = {
-            'endpoint_url': endpoint_url,
             'fields': fields_list,
             'context': context,
             'domain': domain,
@@ -488,12 +512,7 @@ class ExternalDataSyncStrategy(models.Model):
         access_token = self.server_sync_id.token_value
         if auth_type == 'token':
             auth_type = self.server_sync_id.token_in
-        db, uid, username, password = self.get_db_uid_username_password()
         return {
-            'db': db,
-            'uid': uid,
-            'username': username,
-            'password': password,
             'auth_mode': auth_type,
             'token_key': token_key,
             'access_token': access_token,
@@ -512,10 +531,9 @@ class ExternalDataSyncStrategy(models.Model):
             fields_list = self.get_external_fields()
             if fields_list and 'write_date' not in fields_list:
                 fields_list.append('write_date')
-        endpoint_url = self.get_endpoint_url()
-        # todo fix
+            if self.company_ids and 'company_id' not in fields_list:
+                fields_list.append('company_id')
         config = {
-            'endpoint_url': endpoint_url,
             'fields': fields_list,
             'context': context,
             'domain': domain,
@@ -529,10 +547,9 @@ class ExternalDataSyncStrategy(models.Model):
 
     def remote_model_object(self, external_model, **kwargs):
         external_sync = self.get_external_sync()
-        if external_sync == 'jsonrpc':
-            return jsonrpc.model_object(external_model, **kwargs)
-        elif external_sync == 'rest':
-            return jsonrpc.model_object(external_model, **kwargs)
+        if external_sync in ['jsonrpc', 'rest']:
+            odoo_client = self.server_sync_id.get_odoo_client(**kwargs)
+            return odoo_client.create_remote_model(external_model, **kwargs)
         else:
             raise NotImplementedError(f"External sync {external_sync} not implemented yet")
 
@@ -569,18 +586,24 @@ class ExternalDataSyncStrategy(models.Model):
         return self.external_context and ast.literal_eval(self.external_context) or {}
 
     def get_internal_context(self):
-        return self.internal_context and ast.literal_eval(self.internal_context) or {}
+        context = self.internal_context and ast.literal_eval(self.internal_context) or {}
+        if self.company_ids:
+            context['allowed_company_ids'] = self.company_ids.ids
+        return context
 
-    def ensure_internal_context(self):
+    def ensure_internal_context(self, default_company_id=None):
         if self:
             set_contex = False
             context = dict(self.env.context)
-            if self.company_id:
+            if default_company_id:
                 set_contex = True
-                context.update(default_company_id=self.company_id)
+                context.update(default_company_id=default_company_id)
+
             internal_context = self.get_internal_context()
             if internal_context:
+                set_contex = True
                 context.update(internal_context)
+
             if set_contex:
                 self = self.with_context(**context)
         return self
@@ -611,16 +634,17 @@ class ExternalDataSyncStrategy(models.Model):
             raise ValueError(f"Error evaluating script: {e}")
 
     def reverse_mapping(self, internal, raise_not_found_exception=True):
+        # return result_map(int:internal_id,list():external_id), not_mapped_ids(int:internal)
         sync_strategy = self.ensure_one()
         # digunakan untuk mengirim data ke server external
         if not internal:
-            return [0]
+            return [], []
 
         if not isinstance(internal, models.BaseModel):
             _logger.error("Internal Object must")
             if raise_not_found_exception:
                 raise ValueError("Internal Object must")
-            return [0]
+            return [], []
 
         domain = [('internal_odoo_id', 'in', internal.ids), ('sync_strategy_id', '=', sync_strategy.id)]
 
@@ -631,7 +655,7 @@ class ExternalDataSyncStrategy(models.Model):
 
         mapping = defaultdict(list)
         for r in rows:
-            mapping[r['internal_odoo_id']].append(r['external_odoo_id'])
+            r['external_odoo_id'] and mapping[r['internal_odoo_id']].append(r['external_odoo_id'])
 
         result_map = dict(mapping)
 
@@ -641,7 +665,7 @@ class ExternalDataSyncStrategy(models.Model):
             if raise_not_found_exception:
                 raise ValueError("found not mapped data [%s]" % str(not_mapped_ids))
 
-        return result_map
+        return result_map, not_mapped_ids
 
     def get_internal_id_same_as_external(self, item):
         item_dict = {}
@@ -661,7 +685,8 @@ class ExternalDataSyncStrategy(models.Model):
 
     def get_or_create_relation_from_external(self, list_of_int_or_dict, sync_related):
         # Create for many2many or one2many
-        return [self.env['external.data.sync'].relation_from_external(item, sync_related) for item in list_of_int_or_dict]
+        return [self.env['external.data.sync'].relation_from_external(item, sync_related) for item in
+                list_of_int_or_dict]
 
     def call_internal_process_method(self, existing, item, input_dict, data_sync):
         if not isinstance(existing, models.BaseModel) or not self.internal_process_method:

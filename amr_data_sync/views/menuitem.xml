@@ -9,6 +9,11 @@
               action="external_server_sync_action"
               sequence="1"
     />
+    <menuitem id="external_server_company_menu"
+              parent="data_sync_parent_menu"
+              action="external_data_company_action"
+              sequence="1"
+    />
     <menuitem id="external_data_sync_strategy_menu"
               parent="data_sync_parent_menu"
               action="external_data_sync_strategy_action"
