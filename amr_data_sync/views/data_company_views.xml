@@ -1,0 +1,43 @@
+<odoo>
+    <data>
+<!--        <record id="external_data_company_filter" model="ir.ui.view">-->
+<!--            <field name="name">external.data.company.search</field>-->
+<!--            <field name="model">external.data.company</field>-->
+<!--            <field name="arch" type="xml">-->
+<!--                <search string="External Data">-->
+<!--                    <field name="name"/>-->
+<!--                    <group expand="0" string="Group By">-->
+<!--                        <filter name="group_model_internal" string="Internal Model" domain="[]" context="{'group_by': 'internal_model'}"/>-->
+<!--                        <filter name="group_application_name" string="Application Name" domain="[]" context="{'group_by': 'external_app_name'}"/>-->
+<!--                        <filter name="group_model_external" string="Internal Model" domain="[]" context="{'group_by': 'external_model'}"/>-->
+<!--                    </group>-->
+<!--                </search>-->
+<!--            </field>-->
+<!--        </record>-->
+
+        <record id="external_data_company_tree" model="ir.ui.view">
+            <field name="name">external.data.company.tree</field>
+            <field name="model">external.data.company</field>
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <tree editable="bottom" create="1" edit="1">
+                    <field name="active" invisible="1"/>
+                    <field name="company_id"/>
+                    <field name="server_sync_id"/>
+                    <field name="external_app_name" attrs="{'readonly': [('server_sync_id','!=',False)]}"/>
+                    <field name="external_model"/>
+                    <field name="external_id"/>
+                </tree>
+            </field>
+        </record>
+
+        <record model="ir.actions.act_window" id="external_data_company_action">
+            <field name="name">External Company</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">external.data.company</field>
+            <field name="view_mode">tree</field>
+            <field name="domain">[]</field>
+            <field name="context">{'update': True,'create': True}</field>
+        </record>
+    </data>
+</odoo>

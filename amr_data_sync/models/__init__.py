@@ -2,6 +2,7 @@
 
 from . import data_mapping
 from . import data_lookup
+from . import data_company
 
 from . import data_sync
 from . import data_sync_related

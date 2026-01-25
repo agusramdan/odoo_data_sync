@@ -22,6 +22,7 @@ class ExternalDataLookup(models.Model):
     )
     internal_model = fields.Char()
     internal_id = fields.Integer()
+    reverse_able = fields.Boolean()
 
     def action_open_internal(self):
         self.ensure_one()

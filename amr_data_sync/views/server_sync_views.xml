@@ -7,29 +7,32 @@
             <field name="arch" type="xml">
                 <form string="sync">
                     <header>
-                        <button name="action_get_db_name" type="object" string="Get DB Name" class="oe_highlight"  />
-                        <button name="action_authenticate" type="object" string="Authenticate" class="oe_highlight"  />
+<!--                        <button name="action_get_db_name" type="object" string="Get DB Name" class="oe_highlight"  />-->
+<!--                        <button name="action_authenticate" type="object" string="Authenticate" class="oe_highlight"  />-->
                     </header>
                     <sheet>
                         <group>
                             <group>
                                 <field name="name"/>
                                 <field name="app_name"/>
-                                <field name="base_url"/>
-                                <field name="path"/>
-                            </group>
-                            <group>
-                                <field name="odoo_server_db"/>
-                                <field name="odoo_server_uid"/>
                             </group>
                             <group>
                                 <field name="auth_type"/>
-                                <field name="basic_auth_username" attrs="{'invisible':[('auth_type','!=','basic')]}"/>
-                                <field name="basic_auth_password" attrs="{'invisible':[('auth_type','!=','basic')]}"/>
-
-                                <field name="token_in" attrs="{'invisible':[('auth_type','!=','token')]}"/>
-                                <field name="token_key" attrs="{'invisible':[('auth_type','!=','token')]}"/>
-                                <field name="token_value" attrs="{'invisible':[('auth_type','!=','token')]}"/>
+                                <field name="base_url"/>
+                                <field name="path" attrs="{'invisible':[('auth_type','!=','odoo-rcp','jwt-odoo-rcp')]}"/>
+                            </group>
+                            <group attrs="{'invisible':[('auth_type','!=','odoo-rcp','jwt-odoo-rcp')]}">
+                                <field name="odoo_server_db" attrs="{'invisible':[('auth_type','!=','odoo-rcp','jwt-odoo-rcp')]}"/>
+                                <field name="odoo_server_uid" attrs="{'invisible':[('auth_type','!=','odoo-rcp','jwt-odoo-rcp')]}"/>
+                            </group>
+                            <group attrs="{'invisible':[('auth_type','not in',['basic','odoo-rcp','jwt-odoo-rcp'])]}">
+                                <field name="username" attrs="{'invisible':[('auth_type','not in',['basic','odoo-rcp','jwt-odoo-rcp'])]}"/>
+                                <field name="password" attrs="{'invisible':[('auth_type','not in',['basic','odoo-rcp'])]}"/>
+                            </group>
+                            <group attrs="{'invisible':[('auth_type','!=','token')]}">
+                                <field name="token_in" />
+                                <field name="token_key" />
+                                <field name="token_value" />
                             </group>
                         </group>
                     </sheet>
