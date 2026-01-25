@@ -1,0 +1,101 @@
+<odoo>
+    <data>
+<!--        <record id="application_auth_filter" model="ir.ui.view">-->
+<!--            <field name="name">application.auth.search</field>-->
+<!--            <field name="model">application.auth</field>-->
+<!--            <field name="arch" type="xml">-->
+<!--                <search string="External Data">-->
+<!--                    <field name="name"/>-->
+<!--                    <group expand="0" string="Group By">-->
+<!--                        <filter name="group_model_internal" string="Internal Model" domain="[]" context="{'group_by': 'internal_model'}"/>-->
+<!--                        <filter name="group_application_name" string="Application Name" domain="[]" context="{'group_by': 'external_app_name'}"/>-->
+<!--                        <filter name="group_model_external" string="Internal Model" domain="[]" context="{'group_by': 'external_model'}"/>-->
+<!--                    </group>-->
+<!--                </search>-->
+<!--            </field>-->
+<!--        </record>-->
+
+        <record id="application_auth_form" model="ir.ui.view">
+            <field name="name">application.auth.form</field>
+            <field name="model">application.auth</field>
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <form string="sync">
+                    <header>
+                        <field name="active" invisible="1"/>
+<!--                        <button name="action_open_internal" type="object"-->
+<!--                            string="Open Data" class="oe_highlight" attrs="{'invisible':[('internal_id','=',0)]}"/>-->
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="auth_type"/>
+                                <field name="application_resource_id"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Base" name="page_base"
+                                  attrs="{'invisible':[('auth_type','!=','base')]}">
+                                <group>
+                                    <field name="username"/>
+                                    <field name="password"/>
+                                </group>
+                            </page>
+                            <page string="Odoo RCP" name="page_odoo_rcp"
+                                  attrs="{'invisible':[('auth_type','!=','odoo-rcp')]}">
+                                <group>
+                                    <group>
+                                        <field name="username"/>
+                                        <field name="password"/>
+                                    </group>
+                                    <group>
+                                        <field name="odoo_server_db"/>
+                                        <field name="odoo_server_uid"/>
+                                    </group>
+                                </group>
+                            </page>
+                            <page string="Token" name="page_rest_token"
+                                  attrs="{'invisible':[('auth_type','!=','rest-token')]}">
+                                <group>
+                                    <field name="token_in"/>
+                                    <field name="token_key"/>
+                                    <field name="access_token"/>
+                                    <field name="refresh_token"/>
+                                </group>
+                            </page>
+                            <page string="Path" name="page_path" attrs="{'invisible':[('auth_type','not in',['base','rest-token'])]}">
+                                <field name="application_path_ids" />
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="application_auth_tree" model="ir.ui.view">
+            <field name="name">application.auth.tree</field>
+            <field name="model">application.auth</field>
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <tree>
+                    <field name="active" invisible="1"/>
+                    <field name="name"/>
+                    <field name="auth_type"/>
+                    <field name="application_resource_id"/>
+                </tree>
+            </field>
+        </record>
+
+        <record model="ir.actions.act_window" id="application_auth_action">
+            <field name="name">Application Auth</field>
+            <field name="type">ir.actions.act_window</field>
+            <field name="res_model">application.auth</field>
+            <field name="view_mode">tree,form</field>
+            <field name="domain">[]</field>
+            <field name="context">{'update': False}</field>
+        </record>
+
+
+    </data>
+</odoo>

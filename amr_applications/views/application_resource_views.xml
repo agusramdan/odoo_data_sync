@@ -1,0 +1,52 @@
+<odoo>
+    <data>
+        <record id="application_resource_form" model="ir.ui.view">
+            <field name="name">application.resource.form</field>
+            <field name="model">application.resource</field>
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <form string="sync">
+                    <header>
+                        <field name="active" invisible="1"/>
+                    </header>
+                    <sheet>
+                        <group>
+                            <group>
+                                <field name="name"/>
+                                <field name="endpoint"/>
+                            </group>
+                        </group>
+                        <notebook>
+                            <page string="Description">
+                                <field name="description"/>
+                            </page>
+                            <page string="Auth">
+                                <field name="application_auth_ids"/>
+                            </page>
+                            <page string="Path">
+                                <field name="application_path_ids"/>
+                            </page>
+                        </notebook>
+                    </sheet>
+                </form>
+            </field>
+        </record>
+
+        <record id="application_resource_tree" model="ir.ui.view">
+            <field name="name">application.resource.tree</field>
+            <field name="model">application.resource</field>
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <tree>
+                    <field name="sync_strategy_id" invisible="1"/>
+                    <field name="sequence" widget="handle" />
+                    <field name="active" />
+                    <field name="name"/>
+                    <field name="internal_field"/>
+                    <field name="mapping_strategy"/>
+                    <field name="key_name"/>
+                </tree>
+            </field>
+        </record>
+    </data>
+</odoo>
