@@ -78,6 +78,217 @@ def safe_call(call_func, auth):
 
 
 # =========================
+# CORE Session
+# =========================
+class OdooRPCSession(requests.Session):
+    def __init__(self, auth_model):
+        super().__init__()
+        self.auth_model = auth_model
+
+    def request(self, *args, **kwargs):
+        resp = super().request(*args, **kwargs)
+
+        if resp.status_code == 401:
+            self.cookies.clear()
+            self.auth_model.reconnect(self)
+            return super().request(*args, **kwargs)
+
+        return resp
+
+
+class SessionJsonRPCModelObject(OdooRPCSession):
+    def __init__(self, model_name, auth_model, **kwargs):
+        super().__init__(auth_model)
+        self.model_name = model_name
+        self.context = kwargs.get('context', {})
+        self.domain = kwargs.get('domain', [])
+        self.fields = kwargs.get('fields')
+        self.offset = kwargs.get('offset', 0)
+        self.limit = kwargs.get('limit', 500)
+        self.order = kwargs.get('order', None)
+
+    def call(self, method, args, kw=None):
+        payload = {
+            "jsonrpc": "2.0",
+            "method": "call",
+            "params": {
+                "model": self.model_name,
+                "method": method,
+                "args": args or [],
+                "kwargs": kw or {}
+            }
+        }
+        resp = self.session.post(
+            f"{self.base_url}/web/dataset/call_kw",
+            json=normalize_json(payload)
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        # JSON-RPC error
+        if "error" in data:
+            raise RuntimeError(f"Odoo login error: {data['error']}")
+
+        return data.get("result") or []
+
+    def __getattr__(self, method):
+        def delegate_func(*args, **kw):
+            return self.call(method, args, kw=kw)
+
+        return delegate_func
+
+    def search_read(self, domain=None, fields=None, offset=0, limit=None, order=None):
+        method = 'search_read'
+        args = []
+        kw = {
+            'domain': domain or self.domain or [],
+            'fields': fields or self.fields, 'order': order or self.order,
+            'offset': offset or self.offset, 'limit': limit or self.limit,
+        }
+        return self.call(method, args, kw=kw)
+
+    def read(self, *args, fields=None):
+        method = 'read'
+        if not args and self.ids and isinstance(self.ids, (list, tuple)):
+            args = self.ids
+        kw = {'fields': fields or self.fields}
+        return self.call(method, args, kw=kw)
+
+    def search_count(self):
+        method = 'search_count'
+        args = [self.domain or []]
+        return self.call(method, args=args)
+
+    def external_data_callback(self, call_back):
+        total = self.search_count()
+        offset = 0
+        limit = self.limit
+        row_count = self.limit
+        _logger.info("Start : get_external_data %s = total %s", self.model_name, total)
+        while total and row_count == limit:
+            data = self.search_read(offset=offset, limit=limit)
+            row_count = len(data) if data else 0
+            if row_count == 0:
+                break
+            _logger.info("Count %s ,Offset %s, Total: %s", row_count, offset, total)
+            for item in data:
+                offset = offset + 1
+                # self.ids = [item.get('id')]
+                call_back(item, offset=offset, total=total)
+
+        _logger.info("Done : Offset %s = total %s", offset, total)
+
+    def __str__(self):
+        return "client.SessionJsonRPCModelObject({})".format(self.model_name)
+
+    __repr__ = __str__
+
+
+class RestSessionModelObject(requests.Session):
+    def __init__(self, model_name, auth_model, **kwargs):
+        super().__init__()
+        self.auth_model = auth_model
+        self.model_name = model_name
+        self.context = kwargs.get('context', {})
+        self.domain = kwargs.get('domain', [])
+        self.fields = kwargs.get('fields')
+        self.offset = kwargs.get('offset', 0)
+        self.limit = kwargs.get('limit', 500)
+        self.order = kwargs.get('order', None)
+
+        ids = kwargs.get('ids', [])
+        if ids and isinstance(ids, int):
+            self.ids = [ids]
+        else:
+            self.ids = ids or []
+
+    def rest_path_get(self, params=None):
+        path = self.auth_model.get_path()
+        if path:
+            path = f"{path}/{self.model_name}"
+        url = self.auth_model.get_rest_url(path)
+        return self.path_client.rest_path_get(url, params=params)
+
+    def search_read(self, domain=None, fields=None, offset=0, limit=None, order=None, context=None):
+        params = {}
+
+        domain = domain or self.domain
+        if domain:
+            params['domain'] = str(domain)
+
+        fields = fields or self.fields
+        if fields is not None:
+            params['fields'] = str(fields)
+
+        offset = offset or self.offset
+        if offset is not None:
+            params['offset'] = offset
+
+        order = order or self.order
+        if offset is not None:
+            params['order'] = order
+
+        limit = limit or self.limit
+        if limit is not None:
+            params['limit'] = limit
+
+        context = context or self.context
+        if context:
+            params['context'] = str(context)
+
+        response = self.rest_path_get(params=params)
+        return response.json().get("results", [])
+
+    def read(self, ids=None, fields=None):
+        if not ids and self.ids and isinstance(self.ids, (list, tuple)):
+            ids = self.ids[0]
+        params = {}
+        fields = fields or self.fields
+        if ids is not None:
+            params['ids'] = str(ids)
+        if fields is not None:
+            params['fields'] = str(fields)
+        if self.context:
+            params['context'] = str(self.context)
+        response = self.rest_path_get(params=params)
+        return response.json().get("results", [])
+
+    def search_count(self):
+        params = {}
+        if self.domain:
+            params['domain'] = str(self.domain)
+        if self.context:
+            params['context'] = str(self.context)
+        params['count'] = True
+        response = self.rest_path_get(params=params)
+        return response.json().get("count", 0)
+
+    def external_data_callback(self, call_back):
+        total = self.search_count()
+        offset = 0
+        row_count = self.limit
+        limit = self.limit
+        _logger.info("Start : external_data_callback %s = total %s", self.model_name, total)
+        while total and row_count == limit:
+            data = self.search_read(offset=offset, limit=limit)
+            row_count = len(data) if data else 0
+            if row_count == 0:
+                break
+            _logger.info("Count %s ,Offset %s, Total: %s", row_count, offset, total)
+            for item in data:
+                offset = offset + 1
+                self.ids = [item.get('id')]
+                call_back(item, offset=offset, total=total)
+
+        _logger.info("Done : Offset %s = total %s", offset, total)
+
+    def __str__(self):
+        return "client.RestModelObject({})".format(self.model_name)
+
+    __repr__ = __str__
+
+
+# =========================
 # CORE CLIENT
 # =========================
 class OdooClient:

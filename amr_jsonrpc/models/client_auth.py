@@ -3,9 +3,13 @@
 from requests import RequestException
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
+from .. import client
 from ..client import OdooSessionAuth, TokenAuth, BasicAuth, TokenAuthBearer, HeaderTokenAuth, ParamTokenAuth
-import requests
 import logging
+import requests
+from contextlib import contextmanager
+from datetime import datetime
+import uuid
 
 _logger = logging.getLogger(__name__)
 
@@ -43,21 +47,42 @@ class AuthRestToken(models.AbstractModel):
     odoo_server_db = fields.Char()
     odoo_server_uid = fields.Integer()
 
+    def get_rest_url(self, path=None):
+        base_path = self.get_path()
+        base_url = self.get_endpoint_url()
+        if path:
+            if path != '/':
+                path = base_path
+            elif not path.startswith('/'):
+                path = f"{base_path}/{path}"
+        else:
+            path = base_path
+
+        if path:
+            if path.startswith('/'):
+                return f"{base_url}{path}"
+            else:
+                return f"{base_url}/{path}"
+        return base_url
+
+    @api.model
     def get_path(self):
-        raise NotImplemented
+        return ""
 
     @api.model
     def get_odoo_db_name_path(self):
         return '/sync/db_name'
 
+    @api.model
     def get_endpoint_url(self):
         raise NotImplemented
 
     def get_db_name_endpoint_url(self):
         return f"{self.get_endpoint_url()}{self.get_odoo_db_name_path()}"
 
+    @api.model
     def get_token_endpoint_url(self):
-        raise NotImplemented
+        return None
 
     def get_application_name(self):
         raise NotImplemented
@@ -169,3 +194,141 @@ class AuthRestToken(models.AbstractModel):
             'target': 'new',
             'context': context
         }
+
+    def create_session_remote_model(self, model_name, **kwargs):
+        if self.auth_type in ('odoo-rcp',):
+            session = client.SessionJsonRPCModelObject(model_name, self, **kwargs)
+        else:
+            session = client.RestSessionModelObject(model_name, self, **kwargs)
+        self._apply_auth(session)
+        return session
+
+    def reconnect(self, session):
+        self._apply_auth(session)
+
+    # =========================
+    # CONTEXT MANAGER
+    # =========================
+    @contextmanager
+    def session_remote_model(self, model_name, **kwargs):
+        self.ensure_one()
+        session = self.create_session_remote_model(model_name, **kwargs)
+        try:
+            yield session
+        finally:
+            session.close()
+
+    def _apply_odoo_rpc_auth(self, session):
+        self.ensure_one()
+        payload = {
+            "jsonrpc": "2.0",
+            "params": {
+                "db": self.db,
+                "login": self.login,
+                "password": self.password
+            }
+        }
+        resp = session.post(
+            f"{self.get_endpoint_url()}/web/session/authenticate",
+            json=payload
+        )
+        resp.raise_for_status()
+        data = resp.json()
+
+        # JSON-RPC error
+        if "error" in data:
+            raise RuntimeError(f"Odoo login error: {data['error']}")
+
+        result = data.get("result") or {}
+
+        # uid False / None
+        if not result.get("uid"):
+            raise RuntimeError("Odoo login failed: invalid credentials")
+
+        # valid session_id cookie
+        if "session_id" not in self.session.cookies:
+            raise RuntimeError("Odoo login failed: session_id not set")
+
+        # simpan uid (cookie sudah otomatis di session)
+        self.odoo_server_uid = result.get("uid")
+
+    @contextmanager
+    def rest_session(self):
+        """
+        State Lest
+        Contoh penggunaan
+        auth = self.env.ref('test.auth')
+        with server.rest_session() as s:
+            r = s.get(f"{server.get_rest_url('/api/health')}")
+
+        """
+        self.ensure_one()
+        if self.auth_type in ('odoo-rcp',):
+            session = client.OdooRPCSession()
+        else:
+            session = requests.Session()
+        try:
+            self._apply_auth(session)
+            yield session
+        finally:
+            session.close()
+
+    def _apply_auth(self, session: requests.Session):
+        if self.auth_type in ('basic',):
+            self._apply_basic_auth(session)
+        elif self.auth_type in ('odoo-rcp',):
+            self._apply_odoo_rpc_auth(session)
+        elif self.auth_type in ('token', 'rest-token', 'jwt-rest-token'):
+            self._apply_token_auth(session)
+        else:
+            raise ValueError(f"Unsupported auth_type: {self.auth_type}")
+
+    def _apply_basic_auth(self, session):
+        session.auth = (self.username, self.password)
+
+    def _apply_token_auth(self, session):
+        self._refresh_token_if_needed()
+
+        token = self.access_token
+        key = self.token_key or "token"
+
+        if self.token_in == "bearer":
+            session.headers["Authorization"] = f"Bearer {token}"
+
+        elif self.token_in == "basic":
+            session.headers["Authorization"] = f"Basic {token}"
+
+        elif self.token_in == "header":
+            session.headers[key] = token
+
+        elif self.token_in == "param":
+            session.params[key] = token
+
+        elif self.token_in == "body":
+            session.headers["X-Token-In-Body"] = key  # marker
+
+    def _refresh_token_if_needed(self):
+        refresh_endpoint = self.get_token_endpoint_url()
+        if not refresh_endpoint:
+            return
+
+        if self.expires_at and fields.Datetime.now() < self.expires_at:
+            return
+
+        resp = requests.post(
+            refresh_endpoint,
+            json={
+                "refresh_token": self.refresh_token,
+                "username": self.username,
+                "password": self.password,
+            },
+            timeout=15,
+        )
+        resp.raise_for_status()
+
+        data = resp.json()
+        self.write({
+            "access_token": data["access_token"],
+            "refresh_token": data.get("refresh_token"),
+            "expires_at": datetime.utcnow() + fields.DateTime.timedelta(seconds=data.get("expires_in", 3600)),
+        })
