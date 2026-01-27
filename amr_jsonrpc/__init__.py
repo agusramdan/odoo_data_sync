@@ -3,5 +3,6 @@ from . import client
 from . import rest
 from . import jsonrpc
 from . import utils
+from . import remote
 from . import controllers
 from . import models

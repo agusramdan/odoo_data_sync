@@ -75,8 +75,8 @@ def call_with_savepoint(self, method_name, args=None, kwargs=None, logger=_logge
 
     final_args = []
     final_kwargs = {}
-    kwargs = kwargs or {}
-    args = args or []
+    kwargs = dict(kwargs or {})
+    args = list(args or [])
     for name, p in params.items():
         if p.kind in (
                 inspect.Parameter.POSITIONAL_ONLY,
@@ -87,8 +87,9 @@ def call_with_savepoint(self, method_name, args=None, kwargs=None, logger=_logge
                 args = args[1:]
             elif name in kwargs:
                 final_args.append(kwargs[name])
+                kwargs.pop(name)
             elif p.default is not inspect.Parameter.empty:
-                pass
+                final_args.append(p.default)
             else:
                 raise TypeError(f"Missing required argument: {name}")
 
