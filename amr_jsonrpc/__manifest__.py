@@ -7,7 +7,7 @@
     "license": "AGPL-3",
     'website': "http://agus.ramdan.tech",
     'category': 'tools',
-    'version': '13.0.3.0.0',
+    'version': '13.0.4.0.1',
     'depends': ['base', ],
     'data': [
         'security/ir.model.access.csv',
