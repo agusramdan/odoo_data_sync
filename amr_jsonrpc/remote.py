@@ -119,8 +119,8 @@ class RemoteModel:
 
     def read(self, *args, fields=None):
         method = 'read'
-        if not args and self.ids and isinstance(self.ids, (list, tuple)):
-            args = self.ids
+        # if not args and self.ids and isinstance(self.ids, (list, tuple)):
+        #     args = self.ids
         kw = {'fields': fields or self.fields}
         return self.call(method, args, kw=kw)
 
@@ -149,7 +149,7 @@ class RemoteModel:
         _logger.info("Done : Offset %s = total %s", offset, total)
 
     def __str__(self):
-        return "client.RemoteModel({})".format(self.model_name)
+        return "remote.RemoteModel({})".format(self.model_name)
 
     __repr__ = __str__
 
@@ -181,7 +181,7 @@ class OdooSession(requests.Session):
         return rest_url(self.get_endpoint_url(), self.get_base_path(), path)
 
     def connect(self):
-        self.auth_model.connect_session()
+        self.auth_model.connect_session(self)
 
     def request(self, *args, **kwargs):
         resp = super().request(*args, **kwargs)

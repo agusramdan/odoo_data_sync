@@ -233,8 +233,8 @@ class AuthRestToken(models.AbstractModel):
         payload = {
             "jsonrpc": "2.0",
             "params": {
-                "db": self.db,
-                "login": self.login,
+                "db": self.odoo_server_db,
+                "login": self.username,
                 "password": self.password
             }
         }
@@ -330,3 +330,59 @@ class AuthRestToken(models.AbstractModel):
         auth = self.ensure_one()
         with auth.create_session() as rpc:
             return rpc.jsonrpc_call(model, method, args, kw=kw)
+
+    def action_get_odoo_db_name(self):
+        url = f"{self.get_endpoint_url()}/sync/db_name"
+        try:
+            response = requests.get(url)
+            response.raise_for_status()
+            result = response.json()
+            db = result.get('db')
+            if not db:
+                raise UserError('DB not found')
+            self.odoo_server_db = db
+        except RequestException as e:
+            raise UserError(str(e))
+
+    def action_get_odoo_server_uid(self):
+        odoo_session = self.create_session()
+        try:
+            odoo_session.connect()
+            #     db, uid, password = self.jsonrpc_authenticate()
+            #     if uid:
+            #         self.write({'odoo_server_uid': uid})
+            return {
+                'type': 'ir.actions.client',
+                'tag': 'display_notification',
+                'params': {
+                    'title': 'Info',
+                    'message': _("Get UID successful. (DB: %s, UID: %s)") % (self.odoo_server_db, self.odoo_server_uid),
+                    'type': 'info',
+                }
+            }
+        #     else:
+        #         raise UserError(_("Authentication failed. Please check your credentials."))
+        except Exception:
+            raise UserError(_("Authentication failed. Please check your username or credentials."))
+        finally:
+            odoo_session.close()
+
+    def action_test_connection(self):
+        self.action_get_odoo_server_uid()
+        # odoo_session = self.create_session()
+        # odoo_session.connect()
+        # try:
+        #     db, uid, password = self.jsonrpc_authenticate()
+        #     if not uid:
+        #         raise UserError(_("Authentication failed. Please check your credentials."))
+        #     return {
+        #         'type': 'ir.actions.client',
+        #         'tag': 'display_notification',
+        #         'params': {
+        #             'title': 'Info',
+        #             'message': _("Connection successful. (DB: %s, UID: %s)") % (db, uid),
+        #             'type': 'info',
+        #         }
+        #     }
+        # except Exception as e:
+        #     raise UserError(_("Connection failed: %s") % str(e))
