@@ -81,7 +81,7 @@ class AuthRestToken(models.AbstractModel):
 
     @api.model
     def get_token_endpoint_url(self):
-        return self.refresh_endpoint
+        return self.refresh_endpoint or f"{self.get_endpoint_url()}/application/token"
 
     def get_application_name(self):
         raise NotImplemented
@@ -101,6 +101,9 @@ class AuthRestToken(models.AbstractModel):
     def get_password(self):
         return self.password
 
+    def get_access_token(self):
+        return self.access_token
+
     def get_username_password(self):
         return self.get_username(), self.get_password()
 
@@ -110,75 +113,11 @@ class AuthRestToken(models.AbstractModel):
     def get_db_uid_username_password(self):
         return self.get_db_name(), self.get_odoo_uid(), self.get_username(), self.get_password()
 
-    # def create_auth_client(
-    #         self, endpoint_url=None, auth_type=None, **kwargs):
-    #     auth_type = auth_type or self.get_auth_type()
-    #     endpoint_url = endpoint_url or self.get_endpoint_url()
-    #     if auth_type == 'odoo-rcp':
-    #         db, uid, username, password = self.get_db_uid_username_password()
-    #         session_auth = OdooSessionAuth(
-    #             endpoint_url, db=db, login=username, password=password, uid=uid
-    #         )
-    #         session_auth.login_session()
-    #     elif auth_type == 'jwt-odoo-rcp':
-    #         db, uid, username, password = self.get_db_uid_username_password()
-    #         session_auth = OdooSessionAuth(
-    #             endpoint_url, db=db, login=username, password=password, uid=uid
-    #         )
-    #         session_auth.login_session()
-    #     elif auth_type == 'jwt-rest-token':
-    #         session_auth = TokenAuth(
-    #             endpoint_url,
-    #             self.access_token,
-    #             refresh_token=self.refresh_token,
-    #             refresh_endpoint=self.refresh_endpoint or self.get_token_endpoint_url(),
-    #             expires_at=self.expires_at
-    #         )
-    #     elif auth_type in ['rest-token', 'token']:
-    #         if self.token_in == 'basic':
-    #             username, password = self.get_username_password()
-    #             session_auth = BasicAuth(
-    #                 endpoint_url, username=username, password=password, path=kwargs.get('path')
-    #             )
-    #         elif self.token_in == 'bearer':
-    #             session_auth = TokenAuthBearer(
-    #                 endpoint_url,
-    #                 self.access_token,
-    #                 path=kwargs.get('path'),
-    #             )
-    #
-    #         elif self.token_in == 'header':
-    #             session_auth = HeaderTokenAuth(
-    #                 endpoint_url,
-    #                 self.token_key,
-    #                 self.access_token,
-    #                 path=kwargs.get('path'),
-    #             )
-    #         elif self.token_in == 'param':
-    #             session_auth = ParamTokenAuth(
-    #                 endpoint_url,
-    #                 self.token_key,
-    #                 self.access_token,
-    #                 path=kwargs.get('path'),
-    #             )
-    #         else:
-    #             raise UserError("Invalid token_in")
-    #     else:
-    #         raise UserError("Invalid auth_type")
-    #     return session_auth
-
     def action_get_odoo_db_name(self):
-        url = f"{self.rest_endpoint_url()}{self.get_odoo_db_name_path()}"
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            result = response.json()
-            db = result.get('db')
-            if not db:
-                raise UserError('DB not found')
-            self.odoo_server_db = db
-        except RequestException as e:
-            raise UserError(str(e))
+        db_name = remote.get_db_name(self.get_db_name_endpoint_url())
+        if not db_name:
+            raise UserError('DB not found')
+        self.odoo_server_db = db_name
 
     def action_open_token_wizard(self):
         context = dict(self.env.context)
@@ -228,98 +167,106 @@ class AuthRestToken(models.AbstractModel):
     def reconnect_session(self, odoo_session):
         self._apply_auth(odoo_session)
 
-    def _apply_odoo_rpc_auth(self, odoo_session):
-        self.ensure_one()
-        payload = {
-            "jsonrpc": "2.0",
-            "params": {
-                "db": self.odoo_server_db,
-                "login": self.username,
-                "password": self.password
-            }
-        }
-        resp = odoo_session.post(
-            f"{self.get_endpoint_url()}/web/session/authenticate",
-            json=payload
-        )
-        resp.raise_for_status()
-        data = resp.json()
-
-        # JSON-RPC error
-        if "error" in data:
-            raise RuntimeError(f"Odoo login error: {data['error']}")
-
-        result = data.get("result") or {}
-
-        # uid False / None
-        if not result.get("uid"):
-            raise RuntimeError("Odoo login failed: invalid credentials")
-
-        # valid session_id cookie
-        if "session_id" not in odoo_session.cookies:
-            raise RuntimeError("Odoo login failed: session_id not set")
-
-        # simpan uid (cookie sudah otomatis di session)
-        self.odoo_server_uid = result.get("uid")
-
-    def _apply_auth(self, odoo_session: requests.Session):
-        if self.auth_type in ('basic',):
-            self._apply_basic_auth(odoo_session)
-        elif self.auth_type in ('odoo-rcp',):
-            self._apply_odoo_rpc_auth(odoo_session)
-        elif self.auth_type in ('token', 'rest-token', 'jwt-rest-token'):
-            self._apply_token_auth(odoo_session)
-        else:
-            raise ValueError(f"Unsupported auth_type: {self.auth_type}")
-
-    def _apply_basic_auth(self, odoo_session):
-        odoo_session.auth = (self.username, self.password)
-
-    def _apply_token_auth(self, odoo_session):
-        self._refresh_token_if_needed()
-
-        token = self.access_token
-        key = self.token_key or "token"
-
-        if self.token_in == "bearer":
-            odoo_session.headers["Authorization"] = f"Bearer {token}"
-
-        elif self.token_in == "basic":
-            odoo_session.headers["Authorization"] = f"Basic {token}"
-
-        elif self.token_in == "header":
-            odoo_session.headers[key] = token
-
-        elif self.token_in == "param":
-            odoo_session.params[key] = token
-
-        elif self.token_in == "body":
-            odoo_session.headers["X-Token-In-Body"] = key  # marker
-
-    def _refresh_token_if_needed(self):
-        refresh_endpoint = self.get_token_endpoint_url()
-        if not refresh_endpoint:
-            return
-
-        if self.expires_at and fields.Datetime.now() < self.expires_at:
-            return
-
-        resp = requests.post(
-            refresh_endpoint,
-            data={
-                "grant_type": 'refresh_token',
-                "refresh_token": self.refresh_token,
-            },
-            timeout=15,
-        )
-        resp.raise_for_status()
-
-        data = resp.json()
+    def update_token(self, access_token, refresh_token=None, expires_at=None):
         self.write({
-            "access_token": data["access_token"],
-            "refresh_token": data.get("refresh_token"),
-            "expires_at": datetime.utcnow() + fields.DateTime.timedelta(seconds=data.get("expires_in", 3600)),
+            "access_token": access_token,
+            "refresh_token": refresh_token,
+            "expires_at": expires_at,
         })
+
+    # def _apply_odoo_rpc_auth(self, odoo_session):
+    #     self.ensure_one()
+    #     payload = {
+    #         "jsonrpc": "2.0",
+    #         "params": {
+    #             "db": self.odoo_server_db,
+    #             "login": self.username,
+    #             "password": self.password
+    #         }
+    #     }
+    #     resp = odoo_session.post(
+    #         f"{self.get_endpoint_url()}/web/session/authenticate",
+    #         json=payload
+    #     )
+    #     resp.raise_for_status()
+    #     data = resp.json()
+    #
+    #     # JSON-RPC error
+    #     if "error" in data:
+    #         raise RuntimeError(f"Odoo login error: {data['error']}")
+    #
+    #     result = data.get("result") or {}
+    #
+    #     # uid False / None
+    #     if not result.get("uid"):
+    #         raise RuntimeError("Odoo login failed: invalid credentials")
+    #
+    #     # valid session_id cookie
+    #     if "session_id" not in odoo_session.cookies:
+    #         raise RuntimeError("Odoo login failed: session_id not set")
+    #
+    #     # simpan uid (cookie sudah otomatis di session)
+    #     self.odoo_server_uid = result.get("uid")
+
+    def _apply_auth(self, odoo_session):
+        remote.apply_auth(self, odoo_session)
+        # if self.auth_type in ('basic',):
+        #     self._apply_basic_auth(odoo_session)
+        # elif self.auth_type in ('odoo-rcp',):
+        #     self._apply_odoo_rpc_auth(odoo_session)
+        # elif self.auth_type in ('token', 'rest-token', 'jwt-rest-token'):
+        #     self._apply_token_auth(odoo_session)
+        # else:
+        #     raise ValueError(f"Unsupported auth_type: {self.auth_type}")
+
+    # def _apply_basic_auth(self, odoo_session):
+    #     odoo_session.auth = (self.username, self.password)
+    #
+    # def _apply_token_auth(self, odoo_session):
+    #     self._refresh_token_if_needed()
+    #
+    #     token = self.access_token
+    #     key = self.token_key or "token"
+    #
+    #     if self.token_in == "bearer":
+    #         odoo_session.headers["Authorization"] = f"Bearer {token}"
+    #
+    #     elif self.token_in == "basic":
+    #         odoo_session.headers["Authorization"] = f"Basic {token}"
+    #
+    #     elif self.token_in == "header":
+    #         odoo_session.headers[key] = token
+    #
+    #     elif self.token_in == "param":
+    #         odoo_session.params[key] = token
+    #
+    #     elif self.token_in == "body":
+    #         odoo_session.headers["X-Token-In-Body"] = key  # marker
+    #
+    # def _refresh_token_if_needed(self):
+    #     refresh_endpoint = self.get_token_endpoint_url()
+    #     if not refresh_endpoint:
+    #         return
+    #
+    #     if self.expires_at and fields.Datetime.now() < self.expires_at:
+    #         return
+    #
+    #     resp = requests.post(
+    #         refresh_endpoint,
+    #         data={
+    #             "grant_type": 'refresh_token',
+    #             "refresh_token": self.refresh_token,
+    #         },
+    #         timeout=15,
+    #     )
+    #     resp.raise_for_status()
+    #
+    #     data = resp.json()
+    #     self.write({
+    #         "access_token": data["access_token"],
+    #         "refresh_token": data.get("refresh_token"),
+    #         "expires_at": datetime.utcnow() + fields.DateTime.timedelta(seconds=data.get("expires_in", 3600)),
+    #     })
 
     def jsonrpc_execute_kw(self, model, method, args, kw=None):
         auth = self.ensure_one()
@@ -331,26 +278,10 @@ class AuthRestToken(models.AbstractModel):
         with auth.create_session() as rpc:
             return rpc.jsonrpc_call(model, method, args, kw=kw)
 
-    def action_get_odoo_db_name(self):
-        url = f"{self.get_endpoint_url()}/sync/db_name"
-        try:
-            response = requests.get(url)
-            response.raise_for_status()
-            result = response.json()
-            db = result.get('db')
-            if not db:
-                raise UserError('DB not found')
-            self.odoo_server_db = db
-        except RequestException as e:
-            raise UserError(str(e))
-
     def action_get_odoo_server_uid(self):
         odoo_session = self.create_session()
         try:
             odoo_session.connect()
-            #     db, uid, password = self.jsonrpc_authenticate()
-            #     if uid:
-            #         self.write({'odoo_server_uid': uid})
             return {
                 'type': 'ir.actions.client',
                 'tag': 'display_notification',
@@ -360,8 +291,6 @@ class AuthRestToken(models.AbstractModel):
                     'type': 'info',
                 }
             }
-        #     else:
-        #         raise UserError(_("Authentication failed. Please check your credentials."))
         except Exception:
             raise UserError(_("Authentication failed. Please check your username or credentials."))
         finally:
@@ -369,20 +298,3 @@ class AuthRestToken(models.AbstractModel):
 
     def action_test_connection(self):
         self.action_get_odoo_server_uid()
-        # odoo_session = self.create_session()
-        # odoo_session.connect()
-        # try:
-        #     db, uid, password = self.jsonrpc_authenticate()
-        #     if not uid:
-        #         raise UserError(_("Authentication failed. Please check your credentials."))
-        #     return {
-        #         'type': 'ir.actions.client',
-        #         'tag': 'display_notification',
-        #         'params': {
-        #             'title': 'Info',
-        #             'message': _("Connection successful. (DB: %s, UID: %s)") % (db, uid),
-        #             'type': 'info',
-        #         }
-        #     }
-        # except Exception as e:
-        #     raise UserError(_("Connection failed: %s") % str(e))
