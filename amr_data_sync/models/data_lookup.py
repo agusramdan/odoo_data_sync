@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from odoo import models, fields, _
+from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 
 
@@ -17,12 +17,79 @@ class ExternalDataLookup(models.Model):
     )
     external_model = fields.Char()
     external_id = fields.Integer()
+
+    server_sync_id = fields.Many2one('external.server.sync', ondelete='set null')
     external_app_name = fields.Char(
+        compute='_compute_external_app_name',
+        inverse='_inverse_external_app_name',
+        store=True,
         help="""set '*' bila ingin berlaku untuk semua application"""
     )
-    internal_model = fields.Char()
-    internal_id = fields.Integer()
+    internal_ref = fields.Reference(
+        selection='_selection_internal_model',
+        string='Internal Reference',
+    )
+    internal_model = fields.Char(readonly=True)
+    internal_id = fields.Integer(readonly=True)
     reverse_able = fields.Boolean()
+
+    # ===== COMPUTE =====
+    @api.depends('server_sync_id', 'server_sync_id.app_name')
+    def _compute_external_app_name(self):
+        for rec in self:
+            if rec.server_sync_id:
+                rec.external_app_name = rec.server_sync_id.app_name
+            # kalau server_sync_id kosong → JANGAN override
+            # biarkan nilai manual tetap
+
+    # ===== INVERSE =====
+    def _inverse_external_app_name(self):
+        for rec in self:
+            # inverse wajib ada supaya field editable
+            pass
+
+    @api.model
+    def _selection_internal_model(self):
+        IrModel = self.env['ir.model'].sudo()
+
+        domain = [
+            ('transient', '=', False),
+            #('abstract', '=', False),
+            ('model', 'not ilike', 'ir.'),
+            ('model', 'not ilike', 'base.'),
+            ('model', 'not ilike', 'bus.'),
+        ]
+
+        # optional whitelist via context
+        allowed = self.env.context.get('allowed_internal_models')
+        if allowed:
+            domain.append(('model', 'in', allowed))
+
+        models = IrModel.search(domain)
+
+        return [(m.model, m.name) for m in models]
+
+    @api.model_create_multi
+    def create(self, vals_list):
+        for vals in vals_list:
+            ref = vals.get('internal_ref')
+            if ref:
+                model, res_id = ref.split(',')
+                vals.update({
+                    'internal_model': model,
+                    'internal_id': int(res_id),
+                })
+        return super().create(vals_list)
+
+    def write(self, vals):
+        ref = vals.get('internal_ref')
+        if ref:
+            model, res_id = ref.split(',')
+            vals.update({
+                'internal_model': model,
+                'internal_id': int(res_id),
+            })
+        return super().write(vals)
 
     def action_open_internal(self):
         self.ensure_one()

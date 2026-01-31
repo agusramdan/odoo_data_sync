@@ -7,10 +7,6 @@
             <field name="arch" type="xml">
                 <search string="External Data">
                     <field name="display_name"/>
-<!--                    <searchpanel>-->
-<!--                        <field name="sync_strategy_id" icon="fa-home" enable_counters="1"/>-->
-<!--                    </searchpanel>-->
-<!--                    <separator/>-->
                     <filter name="filter_draft" string="Draft" domain="[('state', '=', 'draft')]"/>
                     <filter name="filter_need_resolve" string="Need Resolve" domain="[('state', '=', 'need_resolve')]"/>
                     <filter name="filter_error" string="Error" domain="[('state', '=', 'error')]"/>
@@ -20,6 +16,7 @@
                     <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
                     <group expand="0" string="Group By">
                         <filter name="group_model" string="Model" domain="[]" context="{'group_by': 'internal_model'}"/>
+                        <filter name="group_company" string="Model" domain="[]" context="{'group_by': 'company_id'}"/>
                         <filter name="group_application_name" string="Application Name" domain="[]" context="{'group_by': 'external_app_name'}"/>
                     </group>
                 </search>
@@ -55,6 +52,7 @@
                             <group>
                                 <field name="internal_odoo_id" />
                                 <field name="internal_model"/>
+                                <field name="company_id"/>
                                 <field name="last_success" />
                                 <field name="last_error"/>
                                 <field name="next_processing_datetime" attrs="{'invisible':[('state','=','done')]}"/>
@@ -70,11 +68,6 @@
                                         <field name="field_type" />
                                         <field name="internal_model"/>
                                         <field name="state" />
-<!--                                        <field name="sync_type" />-->
-<!--                                        <field name="model_id" />-->
-<!--                                        <field name="event_date"/>-->
-<!--                                        <field name="erp_external_name"/>-->
-<!--                                        <field name="erp_external_last_update"/>-->
                                     </tree>
                                 </field>
                             </page>

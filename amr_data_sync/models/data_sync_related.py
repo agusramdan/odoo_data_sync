@@ -182,8 +182,6 @@ class ExternalDataSyncRelated(models.Model):
     ):
         # value for this related related_external_data_sync_id
         # parent external_data_sync_id
-        if field_name == 'resource_id':
-            print("ddd")
         field_after_create = field_type in ['many2many', 'one2many']
         update = {
             'field_after_create': field_after_create,
@@ -223,51 +221,6 @@ class ExternalDataSyncRelated(models.Model):
         }
         create_dict.update(update)
         return self.create([create_dict])[0]
-
-    # def get_or_create(
-    #         self, related_external_data_sync_id, external_data_sync_id, field_name, field_type,
-    #         inverse_field=None, required_before_create=False, related_sync_strategy_id=False,
-    #
-    # ):
-    #     # value for this related related_external_data_sync_id
-    #     # parent external_data_sync_id
-    #     if required_before_create:
-    #         field_after_create = False
-    #     elif related_sync_strategy_id:
-    #         field_after_create = external_data_sync_id.internal_model == related_sync_strategy_id.internal_model
-    #
-    #     domain = [
-    #         ('external_data_sync_id', '=', int(external_data_sync_id)),
-    #         ('name', '=', field_name),
-    #         ('field_type', '=', field_type),
-    #     ]
-    #     related = int(related_external_data_sync_id)
-    #     if related:
-    #         existing = self.search(domain + [('related_external_data_sync_id', '=', related)], limit=1)
-    #         if existing:
-    #             return existing
-    #
-    #     existing = self.search(domain + [('related_external_data_sync_id', '=', False)], limit=1)
-    #
-    #     if existing and related:
-    #         existing.write({
-    #             'related_external_data_sync_id': related
-    #         })
-    #         return existing
-    #
-    #     create_dict = {
-    #         'name': field_name,
-    #         'field_after_create': field_after_create,
-    #         'internal_model': related_external_data_sync_id.internal_model,
-    #         'external_data_sync_id': int(external_data_sync_id),
-    #         'field_type': field_type,
-    #         'inverse_field': inverse_field,
-    #         'required_before_create': required_before_create,
-    #         'related_external_data_sync_id': related or None,
-    #
-    #     }
-    #
-    #     return self.create([create_dict])[0]
 
     def internal_lookup(self, item):
         external_id = None
