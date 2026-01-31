@@ -45,7 +45,7 @@ class ExternalDataSyncCron(models.Model):
 
     def cron_sync_from_server(self):
         limit_time = fields.Datetime.now() + datetime.timedelta(minutes=30)
-        data_sync_models = self.search([
+        data_sync_models = self or self.search([
             ('strategy', 'in', ['external_cud', 'external_cu', 'external_create']),
             '|', ('next_sync_datetime', '=', False), ('next_sync_datetime', '<=', fields.Datetime.now())
         ], order='next_sync_datetime asc')

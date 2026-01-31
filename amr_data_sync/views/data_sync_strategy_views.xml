@@ -6,12 +6,6 @@
             <field name="model">external.data.sync.strategy</field>
             <field name="arch" type="xml">
                 <search string="External Data">
-<!--                    <field name="name"/>-->
-<!--                    <searchpanel>-->
-<!--                        <field name="internal_model" icon="fa-home" enable_counters="1"/>-->
-<!--                    </searchpanel>-->
-<!--                    <separator/>-->
-<!--                    <separator/>-->
                     <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
                     <group expand="0" string="Group By">
                         <filter name="group_external_model" string="Model" domain="[]" context="{'group_by': 'external_model'}"/>
@@ -92,19 +86,8 @@
                                         />
                                     </tree>
                                 </field>
-<!--                                <field name="line_sync_strategy_ids" readonly="1">-->
-<!--                                    <tree>-->
-<!--                                        <field name="parent_field_name"/>-->
-<!--                                        <field name="external_model"/>-->
-<!--                                        <field name="internal_model"/>-->
-<!--                                    </tree>-->
-<!--                                </field>-->
                             </page>
                             <page string="Script" attrs="{'invisible':[('internal_process_method','!=',False)]}">
-                                <group>
-                                    <field name="id" invisible="1"/>
-                                    <field name="test_external_data_sync_id" domain="[('sync_strategy_id','=',id)]" />
-                                </group>
                                 <field name="eval_script" widget="code"/>
                             </page>
                         </notebook>

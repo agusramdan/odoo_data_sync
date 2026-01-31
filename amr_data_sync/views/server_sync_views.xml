@@ -14,27 +14,35 @@
                         <group>
                             <group>
                                 <field name="name"/>
-                                <field name="app_name"/>
                             </group>
                             <group>
-                                <field name="auth_type"/>
-                                <field name="base_url"/>
-                                <field name="path" attrs="{'invisible':[('auth_type','!=','odoo-rcp','jwt-odoo-rcp')]}"/>
-                            </group>
-                            <group attrs="{'invisible':[('auth_type','!=','odoo-rcp','jwt-odoo-rcp')]}">
-                                <field name="odoo_server_db" attrs="{'invisible':[('auth_type','!=','odoo-rcp','jwt-odoo-rcp')]}"/>
-                                <field name="odoo_server_uid" attrs="{'invisible':[('auth_type','!=','odoo-rcp','jwt-odoo-rcp')]}"/>
-                            </group>
-                            <group attrs="{'invisible':[('auth_type','not in',['basic','odoo-rcp','jwt-odoo-rcp'])]}">
-                                <field name="username" attrs="{'invisible':[('auth_type','not in',['basic','odoo-rcp','jwt-odoo-rcp'])]}"/>
-                                <field name="password" attrs="{'invisible':[('auth_type','not in',['basic','odoo-rcp'])]}"/>
-                            </group>
-                            <group attrs="{'invisible':[('auth_type','!=','token')]}">
-                                <field name="token_in" />
-                                <field name="token_key" />
-                                <field name="token_value" />
+                                <field name="app_name"/>
                             </group>
                         </group>
+                        <notebook>
+                            <page string="Server Info" name="page_info">
+                                <group>
+                                    <group>
+                                        <field name="base_url"/>
+                                        <field name="auth_type"/>
+                                        <field name="path" attrs="{'invisible':[('auth_type','not in',['odoo-rcp','jwt-odoo-rcp'])]}"/>
+                                    </group>
+                                    <group attrs="{'invisible':[('auth_type','not in',['basic','odoo-rcp','jwt-odoo-rcp'])]}">
+                                        <field name="odoo_server_db" />
+                                        <field name="odoo_server_uid" />
+                                    </group>
+                                    <group attrs="{'invisible':[('auth_type','not in',['basic','odoo-rcp','jwt-odoo-rcp'])]}">
+                                        <field name="username" />
+                                        <field name="password" attrs="{'invisible':[('auth_type','not in',['basic','odoo-rcp'])]}"/>
+                                    </group>
+                                    <group attrs="{'invisible':[('auth_type','not in',['rest-token','token','jwt-odoo-rcp'])]}">
+                                        <field name="token_in" attrs="{'invisible':[('auth_type','not in',['rest-token','token'])]}"/>
+                                        <field name="token_key" attrs="{'invisible':[('auth_type','not in',['rest-token','token'])]}"/>
+                                        <field name="token_value" />
+                                    </group>
+                                </group>
+                            </page>
+                        </notebook>
                     </sheet>
                 </form>
             </field>

@@ -25,7 +25,6 @@
                     <field name="company_id"/>
                     <field name="server_sync_id"/>
                     <field name="external_app_name" attrs="{'readonly': [('server_sync_id','!=',False)]}"/>
-                    <field name="external_model"/>
                     <field name="external_id"/>
                 </tree>
             </field>
