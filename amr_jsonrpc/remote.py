@@ -66,6 +66,37 @@ def get_db_name(url):
     return None
 
 
+def odoo_rpc_auth(self, odoo_session, odoo_server_db, username, password):
+    # 1. Authenticate
+    payload = {
+        "jsonrpc": "2.0",
+        "method": "call",
+        "params": {
+            "service": "common",
+            "method": "authenticate",
+            "args": [odoo_server_db, username, password, {}]
+        },
+        "id": 1,
+    }
+    resp = odoo_session.post(
+        f"{self.get_endpoint_url()}/jsonrpc",
+        json=payload
+    )
+    resp.raise_for_status()
+    data = resp.json()
+
+    # JSON-RPC error
+    if "error" in data:
+        raise RuntimeError(f"Odoo login error: {data['error']}")
+
+    uid = data.get("result")
+    if not uid:
+        raise RuntimeError("Odoo login failed: invalid credentials")
+
+    self.odoo_server_uid = uid
+    return uid
+
+
 def odoo_rpc_session_auth(self, odoo_session, odoo_server_db, username, password):
     payload = {
         "jsonrpc": "2.0",
@@ -87,16 +118,17 @@ def odoo_rpc_session_auth(self, odoo_session, odoo_server_db, username, password
         raise RuntimeError(f"Odoo login error: {data['error']}")
 
     result = data.get("result") or {}
-
+    uid = result.get("uid")
     # uid False / None
-    if not result.get("uid"):
+    if not uid:
         raise RuntimeError("Odoo login failed: invalid credentials")
 
     # valid session_id cookie
     if "session_id" not in odoo_session.cookies:
         raise RuntimeError("Odoo login failed: session_id not set")
         # simpan uid (cookie sudah otomatis di session)
-    self.odoo_server_uid = result.get("uid")
+    self.odoo_server_uid = uid
+    return uid
 
 
 def apply_odoo_rpc_token_auth(self, odoo_session):
@@ -106,7 +138,7 @@ def apply_odoo_rpc_token_auth(self, odoo_session):
         raise ValueError("Odoo RPC auth requires database name")
     username = self.get_username()
     password = self.get_access_token()
-    odoo_rpc_session_auth(self, odoo_session, odoo_server_db, username, password)
+    odoo_rpc_auth(self, odoo_session, odoo_server_db, username, password)
 
 
 def apply_odoo_rpc_auth(self, odoo_session):
@@ -122,6 +154,8 @@ def apply_auth(self, odoo_session: requests.Session):
         apply_basic_auth(self, odoo_session)
     elif self.auth_type in ('odoo-rcp',):
         apply_odoo_rpc_auth(self, odoo_session)
+    elif self.auth_type in ('jwt-odoo-rcp',):
+        apply_odoo_rpc_token_auth(self, odoo_session)
     elif self.auth_type in ('token', 'rest-token', 'jwt-rest-token'):
         apply_token_auth(self, odoo_session)
     else:
@@ -156,7 +190,7 @@ def apply_token_auth(self, odoo_session):
 
 def refresh_token_if_needed(self):
     refresh_endpoint = self.get_token_endpoint_url()
-    if not refresh_endpoint:
+    if not refresh_endpoint or not self.refresh_token:
         return
 
     if self.expires_at and datetime.now().replace(microsecond=0) < self.expires_at:
@@ -280,9 +314,14 @@ class RemoteModel:
 # CORE Remote
 # =========================
 class OdooSession(requests.Session):
-    def __init__(self, auth_model, base_path='/api/sync/data', rcp_path="/web/dataset/call_kw"):
+    def __init__(self, auth_model, base_path='/api/sync/data', rcp_path=None):
         super().__init__()
         self.auth_model = auth_model
+        self.session_rpc = auth_model.get_auth_type() in ('odoo-rcp',)
+        if rcp_path is None and self.session_rpc:
+            rcp_path = "/web/dataset/call_kw"
+        else:
+            rcp_path = "/jsonrpc"
         self.base_path = base_path
         self.rcp_path = rcp_path
 
@@ -316,16 +355,41 @@ class OdooSession(requests.Session):
         return resp
 
     def jsonrpc_call(self, model_name, method, args, kw=None):
-        payload = {
-            "jsonrpc": "2.0",
-            "method": "call",
-            "params": {
-                "model": model_name,
-                "method": method,
-                "args": args or [],
-                "kwargs": kw or {}
+        if self.session_rpc:
+            payload = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "model": model_name,
+                    "method": method,
+                    "args": args or [],
+                    "kwargs": kw or {}
+                }
             }
-        }
+        else:
+            db, uid, username, password = self.auth_model.get_db_uid_username_password()
+            if not db:
+                db = get_db_name(self.auth_model.get_db_name_endpoint_url())
+                if not db:
+                    raise ValueError("Odoo RPC call requires database name")
+            if not uid:
+                uid = odoo_rpc_auth(self.auth_model, self, db, username, password)
+                if not uid:
+                    raise ValueError("Odoo RPC call requires valid uid")
+
+            if not all([db, uid, password]):
+                raise ValueError("Odoo RPC call requires database name, uid, and password")
+
+            payload = {
+                "jsonrpc": "2.0",
+                "method": "call",
+                "params": {
+                    "service": "object",
+                    "method": "execute_kw",
+                    "args": [db, uid, password, model_name, method, args, kw],
+                },
+                "id": 2,
+            }
         url = rest_url(self.get_endpoint_url(), self.get_rcp_path())
         resp = self.post(url, json=normalize_json(payload))
         resp.raise_for_status()
@@ -459,7 +523,7 @@ class RestModelObject(RemoteModel):
 
 if __name__ == "__main__":
     class AuthModel:
-        def __init__(self, auth_type, username, password, access_token=None, refresh_token=None, expires_at=None):
+        def __init__(self, auth_type, username, password=None, access_token=None, refresh_token=None, expires_at=None):
             self.auth_type = auth_type
             self.username = username
             self.password = password
@@ -470,14 +534,25 @@ if __name__ == "__main__":
         def get_db_name(self):
             return None
 
+        def get_username(self):
+            return self.username
+
+        def get_password(self):
+            return self.password
+
         def get_access_token(self):
             return self.access_token
 
         def get_username_password(self):
             return self.username, self.password
 
+        def get_db_uid_username_password(self):
+            access_token = self.password or self.get_access_token()
+            return None, None, self.username, access_token
+
         def get_db_username_password(self):
-            return None, self.username, self.password
+            access_token = self.password or self.get_access_token()
+            return None, self.username, access_token
 
         def get_auth_type(self):
             return self.auth_type
@@ -515,12 +590,21 @@ if __name__ == "__main__":
     partners = remote_rest_partner.read([1, 2, 3, 4], fields=['name', 'email'])
     print("WITHOUT SESSION MODE read:", partners)
 
-    auth_model = AuthModel('odoo-rcp', 'admin', 'admin')
-    # ---- SESSION MODE ----
-    session_auth = OdooSession(auth_model)
-    session_auth.connect()
+    auth_model2 = AuthModel('jwt-odoo-rcp', 'admin', access_token='admin')
+    session_auth2 = OdooSession(auth_model2)
+    session_auth2.connect()
+    remote_partner = JsonRPCRemoteModel("res.partner", session_auth2, context={'lang': 'en_US'})
+    partners = remote_partner.search_read(limit=10)
+    print("TOKEN MODE search_read:", partners)
+    partners = remote_partner.read([1, 2, 3, 4], fields=['name', 'email'])
+    print("TOKEN MODE read:", partners)
 
-    remote_partner = JsonRPCRemoteModel("res.partner", session_auth, context={'lang': 'en_US'})
+    auth_model3 = AuthModel('odoo-rcp', 'admin', password='admin')
+    # ---- SESSION MODE ----
+    session_auth3 = OdooSession(auth_model3)
+    session_auth3.connect()
+
+    remote_partner = JsonRPCRemoteModel("res.partner", session_auth3, context={'lang': 'en_US'})
     partners = remote_partner.search_read(limit=10)
     print("SESSION MODE search_read:", partners)
     partners = remote_partner.read([1, 2, 3, 4], fields=['name', 'email'])
