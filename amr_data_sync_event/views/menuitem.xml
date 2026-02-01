@@ -1,0 +1,8 @@
+<odoo>
+    <menuitem id="menu_external_data_event"
+              name="External Event Data"
+              parent="amr_data_sync.data_sync_parent_menu"
+              action="action_external_data_event"
+              sequence="1"
+    />
+</odoo>

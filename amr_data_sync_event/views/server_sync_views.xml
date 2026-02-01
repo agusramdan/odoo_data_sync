@@ -1,0 +1,29 @@
+<odoo>
+    <data>
+        <record id="external_server_sync_form" model="ir.ui.view">
+            <field name="name">external.server.sync.form</field>
+            <field name="model">external.server.sync</field>
+            <field name="inherit_id" ref="amr_data_sync.external_server_sync_form" />
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <header position="inside">
+                    <button name="action_fetch_event_data_change"
+                            type="object" string="Fetch Event"
+                            class="oe_highlight"
+                            attrs="{'invisible': [('event_listener', '=', False)]}"
+                    />
+                </header>
+
+                <notebook position="inside">
+                    <page string="Event Listener">
+                        <group>
+                            <field name="event_listener"/>
+                            <field name="last_data_event_id"/>
+                        </group>
+                        <field name="strategy_ids"/>
+                    </page>
+                </notebook>
+            </field>
+        </record>
+    </data>
+</odoo>
