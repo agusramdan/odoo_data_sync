@@ -11,7 +11,7 @@
     "license": "AGPL-3",
     'website': "https://agus.ramdan.tech",
     'category': 'tools',
-    'version': '13.0.0.0.1',
+    'version': '13.0.0.0.2',
     'depends': ['base'],
     # always loaded
     'data': [
