@@ -16,7 +16,7 @@
                     <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
                     <group expand="0" string="Group By">
                         <filter name="group_model" string="Model" domain="[]" context="{'group_by': 'internal_model'}"/>
-                        <filter name="group_company" string="Model" domain="[]" context="{'group_by': 'company_id'}"/>
+                        <filter name="group_company" string="Company" domain="[]" context="{'group_by': 'company_id'}"/>
                         <filter name="group_application_name" string="Application Name" domain="[]" context="{'group_by': 'external_app_name'}"/>
                     </group>
                 </search>
