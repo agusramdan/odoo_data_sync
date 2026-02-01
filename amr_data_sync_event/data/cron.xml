@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <record model="ir.cron" id="external_event_data_sync_cron">
+        <field name="name">External Even Data Sync Cron</field>
+        <field name="model_id" ref="model_external_server_sync"/>
+        <field name="state">code</field>
+        <field name="code">model.cron_fetch_event_data_change()</field>
+        <field name="user_id" ref="base.user_root"/>
+        <field name="interval_number">1</field>
+        <field name="interval_type">hours</field>
+        <field name="nextcall" eval="DateTime.now().strftime('%Y-%m-%d %H:05:00')"/>
+        <field name="numbercall">-1</field>
+        <field name="active">True</field>
+    </record>
+
+</odoo>
