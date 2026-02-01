@@ -161,11 +161,14 @@ class AuthRestToken(models.AbstractModel):
         finally:
             odoo_session.close()
 
+    def apply_auth(self, odoo_session):
+        remote.apply_auth(self, odoo_session)
+
     def connect_session(self, odoo_session):
-        self._apply_auth(odoo_session)
+        self.apply_auth(odoo_session)
 
     def reconnect_session(self, odoo_session):
-        self._apply_auth(odoo_session)
+        self.apply_auth(odoo_session)
 
     def update_token(self, access_token, refresh_token=None, expires_at=None):
         self.write({
