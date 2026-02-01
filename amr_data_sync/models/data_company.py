@@ -27,7 +27,6 @@ class ExternalDataLookup(models.Model):
         store=True
     )
     external_id = fields.Integer()
-    external_model = fields.Char(default='res.company')
 
     # ===== COMPUTE =====
     @api.depends('server_sync_id', 'server_sync_id.app_name')
@@ -99,17 +98,9 @@ class ExternalDataLookup(models.Model):
             if raise_not_found_exception:
                 raise ValueError("external_app_name not set")
             return result_map, not_mapped_ids
-        if external_model:
-            domain = [('company_id', 'in', list(not_mapped_ids)),
-                      ('external_app_name', '=', external_app_name), ('external_model', '=', external_model), ]
-            r_map = filter_by_domain(domain)
-            result_map.update(r_map)
-            not_mapped_ids -= r_map.keys()
-        else:
-            domain = [('company_id', 'in', list(not_mapped_ids)),
-                      ('external_app_name', '=', external_app_name), ('external_model', '=', 'res.company'), ]
-            r_map = filter_by_domain(domain)
-            result_map.update(r_map)
-            not_mapped_ids -= r_map.keys()
-
+        domain = [('company_id', 'in', list(not_mapped_ids)),
+                  ('external_app_name', '=', external_app_name), ]
+        r_map = filter_by_domain(domain)
+        result_map.update(r_map)
+        not_mapped_ids -= r_map.keys()
         return result_map, not_mapped_ids
