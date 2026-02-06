@@ -342,20 +342,7 @@ class ExternalDataSync(models.Model):
                 existing = insert_data_sql(existing, [input_dict])[0]
             else:
                 existing = existing.create([input_dict])[0]
-        if existing:
-            after_data = self.process_field_after_create(existing) or {}
-            if after_data:
-                input_dict.update(after_data)
-            self.write_done_internal_odoo(existing, input_dict)
-        else:
-            _logger.info(f"No update or Create {item.get('id')}")
-            self.write({
-                'error_info': "Cannot update and create",
-                'state': 'need_resolve',
-                'payload_json': json.dumps(input_dict, default=date_utils.json_default),
-                'last_processing_datetime': fields.Datetime.now(),
-                'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=8),
-            })
+
         return existing
 
     @savepoint
@@ -406,8 +393,32 @@ class ExternalDataSync(models.Model):
                     return
 
                 input_dict = self.prepare_input_external(item, sync_strategy=sync_strategy)
-                existing = sync_strategy.call_internal_process_method(existing, item, input_dict, self) or existing
-                existing = self.save_data(existing, item, input_dict) or existing
+                result_internal = sync_strategy.call_internal_process_method(existing, item, input_dict, self)
+                skip_save = False
+                if isinstance(result_internal, models.BaseModel):
+                    existing = result_internal
+                    skip_save = True
+                elif isinstance(result_internal, dict):
+                    input_dict = result_internal
+
+                if not skip_save:
+                    existing = self.save_data(existing, item, input_dict)
+
+                if existing:
+                    after_data = self.process_field_after_create(existing) or {}
+                    if after_data:
+                        input_dict.update(after_data)
+                    self.write_done_internal_odoo(existing, input_dict)
+                else:
+                    _logger.info(f"No update or Create {item.get('id')}")
+                    self.write({
+                        'error_info': "Cannot update and create",
+                        'state': 'need_resolve',
+                        'payload_json': json.dumps(input_dict, default=date_utils.json_default),
+                        'last_processing_datetime': fields.Datetime.now(),
+                        'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=8),
+                    })
+
                 all_related_done =self.is_all_related_done()
                 if not all_related_done:
                     self.write({'state': 'need_resolve'})
