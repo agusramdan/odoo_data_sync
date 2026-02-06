@@ -98,6 +98,7 @@ class ExternalDataLookup(models.Model):
             if raise_not_found_exception:
                 raise ValueError("external_app_name not set")
             return result_map, not_mapped_ids
+
         domain = [('company_id', 'in', list(not_mapped_ids)),
                   ('external_app_name', '=', external_app_name), ]
         r_map = filter_by_domain(domain)

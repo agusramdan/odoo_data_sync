@@ -319,6 +319,7 @@ class ExternalDataSync(models.Model):
             self.write(done_data)
 
         return internal_odoo
+
     def ensure_have_sync_strategy(self):
         sync_strategy = self.get_sync_strategy()
         if not self.sync_strategy_id != sync_strategy:

@@ -52,7 +52,7 @@ class ExternalDataSyncCron(models.Model):
         for data_sync in data_sync_models:
             last_sync_datetime = fields.Datetime.now()
             try:
-                data_sync.sync_from_application_server()
+                data_sync.sync_strategy_id.sync_from_application_server()
             except Exception as e:
                 _logger.error(
                     "Error sync from server %s , model %s : %s",
