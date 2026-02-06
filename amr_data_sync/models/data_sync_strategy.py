@@ -674,9 +674,16 @@ class ExternalDataSyncStrategy(models.Model):
                 list_of_int_or_dict]
 
     def call_internal_process_method(self, existing, item, input_dict, data_sync):
-        if not isinstance(existing, models.BaseModel) or not self.internal_process_method:
-            return existing
-        return utils.call_with_savepoint(existing, self.internal_process_method, kwargs={
+        """
+        return
+        1. dict : Lanjutkan prosess di bagian lain
+        2. existing : recordset existing internal model
+        3. raise exception : batalkan proses
+        """
+        if not self.internal_process_method or not isinstance(existing, models.BaseModel):
+            return input_dict
+
+        return utils.call_with_savepoint(existing, self.internal_process_method, rethrow=True, kwargs={
             'data_external': item,
             'data_update': input_dict,
             'sync_strategy': self,
