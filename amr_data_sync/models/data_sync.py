@@ -170,7 +170,9 @@ class ExternalDataSync(models.Model):
     def get_related_data(self, field, value):
         related = self.related_ids.filtered(lambda r: r.name == field.name)
         if related:
-            related.data_json = json.dumps(value)
+            related.write({
+                'data_json': json.dumps(value)
+            })
         elif self.sync_strategy_id and value:
             parent_sync_strategy = self.sync_strategy_id
             sync_strategy = self.sync_strategy_id.lookup_strategy(
@@ -182,7 +184,8 @@ class ExternalDataSync(models.Model):
                     self, field.name, field.type, field_required=field.required,
                     related_sync_strategy_id=sync_strategy,
                     internal_model=field.comodel_name,
-                    inverse_field=field.inverse_name if field.type == 'one2many' else None
+                    inverse_field=field.inverse_name if field.type == 'one2many' else None,
+                    value=value
                 )
         return related.get_data_relation()
 

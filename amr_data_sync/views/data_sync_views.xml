@@ -10,7 +10,7 @@
                     <filter name="filter_draft" string="Draft" domain="[('state', '=', 'draft')]"/>
                     <filter name="filter_need_resolve" string="Need Resolve" domain="[('state', '=', 'need_resolve')]"/>
                     <filter name="filter_error" string="Error" domain="[('state', '=', 'error')]"/>
-                    <filter name="filter_progress" string="Progres" domain="[('state', '=', 'progress')]"/>
+                    <filter name="filter_progress" string="Progres" domain="[('state', 'in', ['progress','process'])]"/>
                     <filter name="filter_done" string="Done" domain="[('state', '=', 'done')]"/>
                     <separator/>
                     <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
