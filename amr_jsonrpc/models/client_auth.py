@@ -1,14 +1,10 @@
 # -*- coding: utf-8 -*-
 
-from requests import RequestException
 from odoo import models, fields, api, _
 from odoo.exceptions import UserError
 from .. import remote
 import logging
-import requests
 from contextlib import contextmanager
-from datetime import datetime
-import uuid
 
 _logger = logging.getLogger(__name__)
 
