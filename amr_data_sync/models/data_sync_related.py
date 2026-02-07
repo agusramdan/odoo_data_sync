@@ -158,6 +158,7 @@ class ExternalDataSyncRelated(models.Model):
             })
             _logger.error("Error process related data %s : %s", self.name, stack_trace)
 
+    @savepoint
     def get_data_relation(self):
 
         if self.state != 'done':
@@ -202,7 +203,7 @@ class ExternalDataSyncRelated(models.Model):
             update['field_after_create'] = False
             update['mandatory_before_create'] = True
         if value:
-            update['data_jason'] = json.dumps(value, default=date_utils.json_default)
+            update['data_json'] = json.dumps(value, default=date_utils.json_default)
         if related_external_data_sync_id:
             update['related_external_data_sync_id'] = int(related_external_data_sync_id)
         domain = [
