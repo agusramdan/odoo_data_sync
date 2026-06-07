@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <!-- FORM VIEW -->
+    <record id="view_internal_data_event_config_form" model="ir.ui.view">
+        <field name="name">internal.data.event.config.form</field>
+        <field name="model">internal.data.event.config</field>
+        <field name="inherit_id" ref="amr_data_event.view_internal_data_event_config_form" />
+        <field name="arch" type="xml">
+            <field name="model_name" position="after">
+                <field name="audiences" />
+            </field>
+        </field>
+    </record>
+</odoo>
