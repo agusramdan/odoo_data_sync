@@ -1,0 +1,119 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <!-- Tree View -->
+    <record id="view_external_data_update_tree" model="ir.ui.view">
+        <field name="name">external.data.update.tree</field>
+        <field name="model">external.data.update</field>
+        <field name="arch" type="xml">
+            <tree>
+                <field name="event_datetime"/>
+                <field name="name"/>
+                <field name="res_model"/>
+                <field name="res_id"/>
+                <field name="operation"/>
+                <field name="state"/>
+                <field name="data_id"/>
+                <field name="strategy_id"/>
+            </tree>
+        </field>
+    </record>
+
+    <!-- Form View -->
+    <record id="view_external_data_update_form" model="ir.ui.view">
+        <field name="name">external.data.update.form</field>
+        <field name="model">external.data.update</field>
+        <field name="arch" type="xml">
+            <form string="Internal Data Update">
+                <header>
+                    <button name="action_process" type="object" string="Process" class="btn-primary" states="accept,error" />
+                    <field name="state" readonly="1" widget="statusbar" statusbar_visible="process,error,done"/>
+                </header>
+                <sheet>
+                    <group>
+                        <group>
+                            <field name="name"/>
+                            <field name="event_datetime"/>
+                            <field name="operation"/>
+                            <field name="state" readonly="1"/>
+                        </group>
+
+                        <group>
+                            <field name="data_id"/>
+                            <field name="strategy_id"/>
+                            <field name="res_model"/>
+                            <field name="res_id"/>
+                        </group>
+                    </group>
+
+                    <notebook>
+
+                        <page string="Raw Payload">
+                            <group>
+                                <field name="raw_payload"
+                                       widget="text"
+                                       nolabel="1"/>
+                            </group>
+                        </page>
+
+                        <page string="Data Payload">
+                            <group>
+                                <field name="data_payload"
+                                       widget="text"
+                                       nolabel="1"/>
+                            </group>
+                        </page>
+
+                        <page string="Error">
+                            <group>
+                                <field name="error_message"
+                                       widget="text"
+                                       nolabel="1"/>
+                            </group>
+                        </page>
+
+                    </notebook>
+                </sheet>
+            </form>
+        </field>
+    </record>
+
+    <!-- Search View -->
+    <record id="view_external_data_update_search" model="ir.ui.view">
+        <field name="name">external.data.update.search</field>
+        <field name="model">external.data.update</field>
+        <field name="arch" type="xml">
+            <search>
+                <field name="name"/>
+                <field name="res_model"/>
+                <field name="res_id"/>
+
+                <filter string="Accept"
+                        name="accept"
+                        domain="[('state','=','accept')]"/>
+
+                <filter string="Error"
+                        name="error"
+                        domain="[('state','=','error')]"/>
+
+                <filter string="Done"
+                        name="done"
+                        domain="[('state','=','done')]"/>
+
+                <group expand="0" string="Group By">
+                    <filter string="State" name="group_by_state" context="{'group_by':'state'}"/>
+                    <filter string="Model" name="group_by_res_model" context="{'group_by':'res_model'}"/>
+                    <filter string="Operation" name="group_by_res_model" context="{'group_by':'operation'}"/>
+                </group>
+            </search>
+        </field>
+    </record>
+
+    <!-- Action -->
+    <record id="external_data_update_action" model="ir.actions.act_window">
+        <field name="name">External Data Update</field>
+        <field name="res_model">external.data.update</field>
+        <field name="view_mode">tree,form</field>
+    </record>
+
+</odoo>

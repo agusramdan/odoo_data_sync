@@ -52,6 +52,7 @@
                                         <field name="internal_lookup_fields" string="Lookup by Fields"/>
                                         <field name="internal_lookup_method" string="Lookup using Method"/>
                                         <field name="internal_event_sync_done" string="Done event Method"/>
+                                        <field name="internal_event_archived_done" string="Archived event Method" />
                                     </group>
                                 </group>
                             </page>
@@ -79,6 +80,7 @@
                                         <field name="name"/>
                                         <field name="internal_field"/>
                                         <field name="mapping_strategy"/>
+                                        <field name="relation_strategy_id" attrs="{'invisible':[('mapping_strategy','!=','many2one')]}"/>
                                         <field name="key_name"/>
                                         <button name="action_open_view" type="object"
                                                 string="More" class="oe_highlight"

@@ -1,10 +1,11 @@
 # -*- coding: utf-8 -*-
-
-from odoo import models, fields, _
+import json
 from datetime import datetime
+
+from odoo import _, fields, models
 from odoo.tools.safe_eval import safe_eval
 
-from ..tools.utils import is_callable_method, has_kwargs
+from ..tools.utils import has_kwargs, is_callable_method
 
 
 class ExternalDataMapping(models.Model):
@@ -36,6 +37,7 @@ class ExternalDataMapping(models.Model):
     internal_field = fields.Char()
     mapping_strategy = fields.Selection([
         ('field_mapping', 'Field Mapping'),
+        ('parent', 'Parent'),
         ('many2one', 'Many 2 One'),
         ('constant', 'Constant'),
         ('function', "Function"),
@@ -69,23 +71,59 @@ class ExternalDataMapping(models.Model):
                 rec.constant_simple_value = False
 
     def mapping_data(self, external_data, model=None, parent_data_sync=None, field=None):
-
-        if self.mapping_strategy == 'many2one':
-            related_external_data_sync_id = self.env['external.data.sync'].get_or_create(
-                external_data, self.relation_strategy_id
-            )
-            if parent_data_sync:
-                key_name = self.key_name or self.internal_field
-                field_name = self.internal_field or self.key_name
-                related = parent_data_sync.related_ids.create_or_get_related(
-                    parent_data_sync, field_name, 'many2one',
-                    related_sync_strategy_id=self.relation_strategy_id,
-                    related_external_data_sync_id=related_external_data_sync_id,
-                    field_required=field and field.required,
-                    value=external_data.get(key_name)
+        key_name = self.key_name or self.internal_field
+        field_name = self.internal_field or self.key_name
+        value = external_data.get(key_name)
+        if self.mapping_strategy == 'parent':
+            related = self.env['external.data.sync.related'].get_relation(field_name, parent_data_sync)
+            data_json=json.dumps(value)
+            if related:
+                if data_json != related.data_json:
+                    related.write({
+                        'data_json':json.dumps(value)
+                    })
+            else:
+                related = self.env['external.data.sync.related'].create_parent(field_name,parent_data_sync,value)
+            return related.get_data_relation()
+        elif self.mapping_strategy == 'many2one':
+            related = self.env['external.data.sync.related'].get_relation(field_name, parent_data_sync)
+            data_json = json.dumps(value)
+            if related:
+                if data_json != related.data_json:
+                    related.write({
+                        'data_json': json.dumps(value)
+                    })
+            else:
+                related = self.env['external.data.sync.related'].create_many2one(field_name, parent_data_sync, value,self.relation_strategy_id)
+            return related.get_data_relation()
+        elif self.mapping_strategy == 'many2many':
+            related = self.env['external.data.sync.related'].get_relation(field_name, parent_data_sync)
+            data_json = json.dumps(value)
+            if related:
+                if data_json != related.data_json:
+                    related.write({
+                        'data_json': json.dumps(value)
+                    })
+            else:
+                related = self.env['external.data.sync.related'].create_many2many(
+                    field_name, parent_data_sync, value,self.relation_strategy_id
                 )
-                if related:
-                    return related.get_data_relation()
+            return related.get_data_relation()
+            # related_external_data_sync_id = self.env['external.data.sync'].get_or_create(
+            #     external_data, self.relation_strategy_id
+            # )
+            # if parent_data_sync:
+            #     key_name = self.key_name or self.internal_field
+            #     field_name = self.internal_field or self.key_name
+            #     related = parent_data_sync.related_ids.create_or_get_related(
+            #         parent_data_sync, field_name, 'many2one',
+            #         related_sync_strategy_id=self.relation_strategy_id,
+            #         related_external_data_sync_id=related_external_data_sync_id,
+            #         field_required=field and field.required,
+            #         value=external_data.get(key_name)
+            #     )
+            #     if related:
+            #         return related.get_data_relation()
 
         elif self.mapping_strategy == 'field_mapping':
             key_name = self.key_name or self.internal_field

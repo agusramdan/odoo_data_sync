@@ -12,12 +12,17 @@
                     <filter name="filter_error" string="Error" domain="[('state', '=', 'error')]"/>
                     <filter name="filter_progress" string="Progres" domain="[('state', 'in', ['progress','process'])]"/>
                     <filter name="filter_done" string="Done" domain="[('state', '=', 'done')]"/>
+                    <filter name="filter_deleted" string="External Deleted" domain="[('external_deleted', '=', True)]"/>
+                    <filter name="filter_archived" string="External Archived" domain="[('external_archived', '=', True)]"/>
                     <separator/>
                     <filter string="Archived" name="inactive" domain="[('active', '=', False)]"/>
                     <group expand="0" string="Group By">
                         <filter name="group_model" string="Model" domain="[]" context="{'group_by': 'internal_model'}"/>
                         <filter name="group_company" string="Company" domain="[]" context="{'group_by': 'company_id'}"/>
+                        <filter name="group_state" string="State" domain="[]" context="{'group_by': 'state'}"/>
                         <filter name="group_application_name" string="Application Name" domain="[]" context="{'group_by': 'external_app_name'}"/>
+                        <filter name="group_deleted" string="External Deleted" domain="[]" context="{'group_by': 'external_deleted'}"/>
+                        <filter name="group_archived" string="External Archived" domain="[]" context="{'group_by': 'external_archived'}"/>
                     </group>
                 </search>
             </field>
@@ -46,6 +51,8 @@
                                 <field name="external_model"/>
                                 <field name="external_app_name"/>
                                 <field name="external_last_update"/>
+                                <field name="external_deleted"/>
+                                <field name="external_archived"/>
                                 <field name="display_name"/>
                                 <field name="need_get_data_json"/>
                             </group>
@@ -53,6 +60,9 @@
                                 <field name="internal_odoo_id" />
                                 <field name="internal_model"/>
                                 <field name="company_id"/>
+                                <field name="archived_datetime" />
+                                <field name="deleted_datetime" />
+                                <field name="request_datetime" />
                                 <field name="last_success" />
                                 <field name="last_error"/>
                                 <field name="next_processing_datetime" attrs="{'invisible':[('state','=','done')]}"/>
@@ -107,7 +117,8 @@
 
                     <field name="internal_odoo_id"/>
                     <field name="internal_model"/>
-
+                    <field name="last_processing_datetime" optional="hide"/>
+                    <field name="next_processing_datetime" optional="hide"/>
                     <field name="last_success"/>
                     <field name="last_error"/>
                     <field name="state" />

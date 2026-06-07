@@ -1,13 +1,16 @@
 # -*- coding: utf-8 -*-
 
-from collections import defaultdict
-from odoo import models, fields, api, _
-from odoo.exceptions import UserError
-from odoo.tools.safe_eval import safe_eval
-from ..tools.utils import is_callable_method, get_callable_method, convert_from_external_data
-from odoo.addons.amr_jsonrpc import utils
 import ast
 import logging
+from collections import defaultdict
+
+from odoo import _, api, fields, models
+from odoo.addons.amr_jsonrpc import utils
+from odoo.exceptions import UserError
+from odoo.tools.safe_eval import safe_eval
+
+from ..tools.utils import (convert_from_external_data, get_callable_method,
+                           is_callable_method)
 
 _logger = logging.getLogger(__name__)
 
@@ -69,6 +72,7 @@ class ExternalDataSyncStrategy(models.Model):
         ('external_cu', 'Create Update'),
         ('external_create', 'Create Only'),
         ('external_update', 'Update Only'),
+        ('external_push', 'External Push')
     ], help="""
     Strategy
     """)
@@ -79,7 +83,7 @@ class ExternalDataSyncStrategy(models.Model):
         ('jsonrpc', 'Json-RPC'),
         ('rest', 'Rest'),
         ('method_call', 'Method Call'),
-    ], default='jsonrpc')
+    ], default='jsonrpc', help="Deprecated Depend and move ot sync server")
 
     parent_sync_strategy_id = fields.Many2one(
         'external.data.sync.strategy',
@@ -109,6 +113,9 @@ class ExternalDataSyncStrategy(models.Model):
     )
     internal_event_sync_done = fields.Char(
         help="Method ini di saat sync selesai"
+    )
+    internal_event_archived_done = fields.Char(
+        help="Data dilakukan archive maka internal_event_sync_done tidak akan di panggil",
     )
     sync_cron = fields.Boolean()
 
@@ -238,16 +245,16 @@ class ExternalDataSyncStrategy(models.Model):
         return self.server_sync_id or self.server_sync_id.search([('app_name', '=', self.external_app_name)], limit=1)
 
     def is_delete_able_from_external(self):
-        return self.strategy in ['external_cud']
+        return self.strategy in ['external_push', 'external_cud']
 
     def is_update_able_from_external(self):
-        return self.strategy in ['external_cud', 'external_cu', 'external_update']
+        return self.strategy in ['external_push', 'external_cud', 'external_cu', 'external_update']
 
     def is_update_only_from_external(self):
-        return self.strategy == 'external_update'
+        return self.strategy in ['external_push', 'external_update']
 
     def is_create_able_from_external(self):
-        return self.strategy in ['external_cud', 'external_cu', 'external_create']
+        return self.strategy in ['external_push', 'external_cud', 'external_cu', 'external_create']
 
     def get_include_fields(self):
         include_fields = []
@@ -305,7 +312,8 @@ class ExternalDataSyncStrategy(models.Model):
         Model = self.env[self.internal_model].sudo()
         if self.internal_id_same_as_external and external_id:
             internal_id = external_id + self.internal_id_offset
-            _logger.debug("internal_id_same_as_external %s = %s + %s ",external_id, self.internal_id_offset, internal_id,)
+            _logger.debug("internal_id_same_as_external %s = %s + %s ", external_id, self.internal_id_offset,
+                          internal_id, )
             return Model.with_context(active_test=False).search([('id', '=', internal_id)])
 
         if is_callable_method(Model, self.internal_lookup_method):
@@ -365,11 +373,11 @@ class ExternalDataSyncStrategy(models.Model):
 
         return strategy or self.browse()
 
-    def lookup_company(self,external_data):
+    def lookup_company(self, external_data):
         if not external_data:
             return None
         return self.env['external.data.company'].lookup_company(
-            external_data,server_sync=self.get_server_sync(),external_app_name=self.get_external_application_name()
+            external_data, server_sync=self.get_server_sync(), external_app_name=self.get_external_application_name()
         )
 
     def prepare_input_external(self, parent_object, item, **kwargs):
@@ -390,16 +398,19 @@ class ExternalDataSyncStrategy(models.Model):
             related_data_process_after_mapping = {}
             for k, v in item.items():
                 if k not in fields_write_able or k not in _fields or k in exclude_fields:
+                    _logger.info("%s not write able", k)
                     continue
                 f = _fields[k]
 
                 if f.compute or f.related:
+                    _logger.info("%s compute or related", k)
                     continue
 
                 if f.type == 'boolean':
                     input_dict[k] = bool(v)
                     continue
                 if not v:
+                    _logger.info("%s empty data %s", k, v)
                     continue
                 if f.name == 'company_id' and f.type == 'many2one':
                     company = self.lookup_company(v)
@@ -513,7 +524,6 @@ class ExternalDataSyncStrategy(models.Model):
         }
         return config
 
-
     def prepare_sync_one_dict(self):
         # context
         context = self.get_external_context()
@@ -538,7 +548,6 @@ class ExternalDataSyncStrategy(models.Model):
     def internal_model_object(self):
         if self.internal_model:
             return self.env[self.internal_model]
-
 
     def sync_list_model_object(self):
         # ModelObject = self.sync_list_model_object()
@@ -683,7 +692,7 @@ class ExternalDataSyncStrategy(models.Model):
         if not self.internal_process_method or not isinstance(existing, models.BaseModel):
             return input_dict
 
-        return utils.call_with_savepoint(existing, self.internal_process_method, rethrow=True, kwargs={
+        return utils.call_safe(existing, self.internal_process_method, kwargs={
             'data_external': item,
             'data_update': input_dict,
             'sync_strategy': self,
@@ -693,7 +702,15 @@ class ExternalDataSyncStrategy(models.Model):
     def event_external_data_sync_done(self, existing, item, input_dict):
         if not isinstance(existing, models.BaseModel) or not self.internal_event_sync_done:
             return existing
-        utils.call_with_savepoint(existing, self.internal_event_sync_done, kwargs={
+        return utils.call_with_savepoint(existing, self.internal_event_sync_done, kwargs={
+            'data_external': item,
+            'data_update': input_dict,
+        })
+
+    def event_external_archived_done(self, existing, item, input_dict):
+        if not isinstance(existing, models.BaseModel) or not self.internal_event_archived_done:
+            return existing
+        return utils.call_with_savepoint(existing, self.internal_event_archived_done, kwargs={
             'data_external': item,
             'data_update': input_dict,
         })

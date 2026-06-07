@@ -25,3 +25,6 @@ access_external_data_sync_exclude_admin,external.data.sync_exclude Admin,model_e
 
 access_external_data_sync_related_user,external.data.sync.related User,model_external_data_sync_related,base.group_user,1,1,1,0
 access_external_data_sync_related_admin,external.data.sync.related Admin,model_external_data_sync_related,base.group_erp_manager,1,1,1,1
+
+access_external_data_update_user,external.data.update User,model_external_data_update,base.group_user,1,1,1,0
+access_external_data_update_admin,external.data.update Admin,model_external_data_update,base.group_erp_manager,1,1,1,1

@@ -10,8 +10,8 @@
     "license": "AGPL-3",
     'website': "http://agus.ramdan.tech",
     'category': 'API',
-    'version': '13.0.2.2.4',
-    'depends': ['base', 'mail', 'amr_jsonrpc'],
+    'version': '13.0.2.3.0',
+    'depends': ['base', 'mail', 'amr_jsonrpc', 'amr_service_client'],
     # always loaded
     'data': [
         'security/ir.model.access.csv',
@@ -24,6 +24,7 @@
         'views/data_sync_cron_views.xml',
         'views/data_lookup_views.xml',
         'views/data_mapping_views.xml',
+        'views/data_update_views.xml',
         'views/menuitem.xml',
         'data/cron.xml',
     ],

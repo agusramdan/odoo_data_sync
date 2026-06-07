@@ -16,6 +16,7 @@
                                 <field name="name"/>
                                 <field name="mapping_strategy"/>
                                 <field name="internal_field"/>
+                                <field name="relation_strategy_id" attrs="{'invisible':[('mapping_strategy','!=','many2one')]}"/>
                             </group>
                             <group>
                                 <field name="key_name"/>

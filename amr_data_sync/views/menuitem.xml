@@ -44,5 +44,11 @@
               action="external_data_sync_action"
               sequence="10"
     />
+    <menuitem id="external_data_update_menu"
+              name="Data Updates"
+              parent="data_sync_parent_menu"
+              action="external_data_update_action"
+              sequence="11"
+    />
 
 </odoo>

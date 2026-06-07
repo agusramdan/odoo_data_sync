@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 import datetime
-from odoo import models, fields, api, _
-import traceback
 import logging
+
+from odoo import api, fields, models
 
 _logger = logging.getLogger(__name__)
 
@@ -53,18 +53,44 @@ class ExternalDataSyncCron(models.Model):
             last_sync_datetime = fields.Datetime.now()
             try:
                 data_sync.sync_strategy_id.sync_from_application_server()
-            except Exception as e:
-                _logger.error(
-                    "Error sync from server %s , model %s : %s",
+            except Exception:
+                _logger.exception(
+                    "Error sync from server %s, model %s",
                     data_sync.external_app_name,
                     data_sync.external_model,
-                    traceback.format_exc()
                 )
             finally:
                 data_sync.write({
                     'last_sync_datetime': last_sync_datetime,
                     'next_sync_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
                 })
+            if data_sync.sync_strategy_id.is_delete_able_from_external():
+                _logger.info(
+                    "check deleted data %s, model %s",
+                    data_sync.external_app_name,
+                    data_sync.external_model,
+                )
+                datas = self.env['external.data.sync'].search([
+                    ('state','=','done'),('external_deleted','=',False),('external_archived','=',False),
+                    ('sync_strategy_id','=',data_sync.sync_strategy_id.id)
+                ], limit=1000, order = 'next_processing_datetime')
+                for data in datas:
+                    deleted = False
+                    try:
+                        with self.env.cr.savepoint():
+                            deleted= data.validate_json_data_for_delete()
+                    except Exception:
+                        _logger.exception(
+                            "Error sync from server %s, model %s",
+                            data_sync.external_app_name,
+                            data.external_model,
+                        )
+                    finally:
+                        if not deleted:
+                            data.write({
+                                'last_processing_datetime': last_sync_datetime,
+                                'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
+                            })
 
             if fields.Datetime.now() > limit_time:
                 break

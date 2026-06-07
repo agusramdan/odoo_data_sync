@@ -1,18 +1,15 @@
 # -*- coding: utf-8 -*-
 
 import ast
-import datetime
-from collections import defaultdict
-
-from odoo import models, fields, api, _
-from odoo.exceptions import UserError
-from odoo.tools import date_utils
-from ..tools.utils import is_callable_method
-from odoo.addons.amr_jsonrpc.utils import savepoint
-
 import json
-import traceback
 import logging
+import traceback
+
+from odoo import api, fields, models, SUPERUSER_ID
+from odoo.addons.amr_jsonrpc.utils import savepoint
+from odoo.tools import date_utils
+
+from ..tools.utils import is_callable_method
 
 _logger = logging.getLogger(__name__)
 
@@ -36,12 +33,12 @@ class ExternalDataSyncRelated(models.Model):
     )
     field_after_create = fields.Boolean()
     field_type = fields.Selection(
-        [('many2one', 'Many2one'), ('one2many', 'One2many'), ('many2many', 'Many2many')],
+        [('parent', 'Parent'),('many2one', 'Many2one'), ('one2many', 'One2many'), ('many2many', 'Many2many')],
     )
     state = fields.Selection([
         ('draft', 'Draft'), ('process', 'Process'), ('need_resolve', 'Need Resolve'),
         ('error', 'Error'), ('done', 'Done'),
-    ])
+    ],default='draft')
     data_json = fields.Text()
     internal_data_eval = fields.Text()
     related_external_data_sync_id = fields.Many2one(
@@ -50,6 +47,37 @@ class ExternalDataSyncRelated(models.Model):
     )
     mandatory_before_create = fields.Boolean()
     next_processing_datetime = fields.Datetime()
+
+    def get_relation(self,name,external_data_sync):
+        return self.search([('name','=',name),('external_data_sync_id','=',int(external_data_sync))])
+
+    def create_parent(self, name, external_data_sync,value):
+        sync_strategy = external_data_sync.sync_strategy_id
+        return self.create({
+            'name': name,
+            'field_type': 'parent',
+            'external_data_sync_id': external_data_sync.id,
+            'sync_strategy_id':sync_strategy.id,
+            'data_json': json.dumps(value)
+        })
+
+    def create_many2one(self,name,external_data_sync,value,sync_strategy):
+        return self.create({
+            'name':name,
+            'field_type': 'many2one',
+            'external_data_sync_id': external_data_sync.id,
+            'sync_strategy_id': sync_strategy.id,
+            'data_json':json.dumps(value)
+        })
+
+    def create_many2many(self,name,external_data_sync,value,sync_strategy):
+        return self.create({
+            'name':name,
+            'field_type': 'many2many',
+            'external_data_sync_id': external_data_sync.id,
+            'sync_strategy_id': sync_strategy.id,
+            'data_json':json.dumps(value)
+        })
 
     def get_All_data_relation(self):
         if self.env.context.get("__try_process_relation"):
@@ -72,19 +100,60 @@ class ExternalDataSyncRelated(models.Model):
         for related in self.with_context(__process_relation=True, __try_process_relation=True):
             related.process_data()
 
-    @savepoint
+    # @savepoint(rethrow=True)
     def process_field_after_create(self):
         if self.env.context.get("__process_relation") or self.env.context.get("__process_field_after_create"):
             _logger.info(f"rekursif terdekteksi {self.name} , {self.internal_model}")
             return
         self.with_context(__process_relation=True, __process_field_after_create=True).process_data()
 
-    @savepoint
+    def dispatch_process(self,run_immediate=False):
+        self.write({'state': 'process'})
+        if run_immediate:
+            id_= self.id
+            with self.pool.cursor() as cr:
+                env = api.Environment(cr, self.env.uid, self.env.context)
+                rec = env[self._name].browse(id_)
+                try:
+                    rec.process_data()
+                    cr.commit()
+                except Exception:
+                    import datetime
+                    _logger.exception("Error rec %s", self)
+                    cr.rollback()
+                    rec = env[self._name].browse(id_)
+                    rec.write_error_safe({
+                        'error_info': traceback.format_exc(),
+                        'state': 'error',
+                        'last_error': fields.Datetime.now(),
+                        'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
+                    })
+
+    # @savepoint(rethrow=True)
     def process_data(self):
         try:
             if not self.data_json:
                 return
             item = json.loads(self.data_json)
+            if self.sync_strategy_id.internal_id_same_as_external:
+                if self.field_type in ['parent','many2one']:
+                    _logger.info("Parent do not need parse")
+                    internal_data_eval = None
+                    if isinstance(item, dict):
+                        internal_data_eval = item.get('id')
+                    if isinstance(item, list):
+                        internal_data_eval = item[0]
+                    if isinstance(item, int):
+                        internal_data_eval = item
+                    if internal_data_eval is not None:
+                        self.internal_data_eval = str(internal_data_eval)
+                        self.state = 'done'
+                        return
+                elif self.field_type == 'many2many' and isinstance(item, list):
+                    self.internal_data_eval = str(item)
+                    self.state = 'done'
+                    return
+
             if self.field_type == 'many2one':
                 if self.related_external_data_sync_id:
                     external_data_sync = self.related_external_data_sync_id
@@ -150,15 +219,16 @@ class ExternalDataSyncRelated(models.Model):
                             'internal_data_eval': None,
                         })
 
-        except Exception:
+        except Exception :
             stack_trace = traceback.format_exc()
-            self.write({
+            self.write_error_safe({
                 'state': 'error',
                 'internal_data_eval': None,
             })
             _logger.error("Error process related data %s : %s", self.name, stack_trace)
+            raise
 
-    @savepoint
+    # @savepoint(rethrow=True)
     def get_data_relation(self):
 
         if self.state != 'done':
@@ -249,3 +319,16 @@ class ExternalDataSyncRelated(models.Model):
             method = getattr(Model, "lookup_internal_from_external_data")
             return method(item, sync_strategy=self.related_external_data_sync_id.sync_strategy_id)
         return None
+
+    def write_error_safe(self, error_data, using_pool=False):
+        if using_pool:
+            _logger.info("write_error_safe using_pool %s .", self)
+            with self.pool.cursor() as cr:
+                # write kita ada exception
+                env = api.Environment(cr, SUPERUSER_ID, self.env.context)
+                self.with_env(env).write(error_data)
+                cr.commit()
+        else:
+            _logger.info("write_error_safe not using_pool %s .", self)
+            with self.env.cr.savepoint():
+                self.write(error_data)

@@ -10,11 +10,12 @@
                     <filter name="filter_draft" string="Draft" domain="[('state', '=', 'draft')]"/>
                     <filter name="filter_need_resolve" string="Need Resolve" domain="[('state', '=', 'need_resolve')]"/>
                     <filter name="filter_error" string="Error" domain="[('state', '=', 'error')]"/>
-                    <filter name="filter_progress" string="Progres" domain="[('state', '=', 'progress')]"/>
+                    <filter name="filter_progress" string="Progres" domain="[('state', 'in', ['progress','process'])]"/>
                     <filter name="filter_done" string="Done" domain="[('state', '=', 'done')]"/>
                     <separator/>
                     <group expand="0" string="Group By">
                         <filter name="group_model" string="Model" domain="[]" context="{'group_by': 'internal_model'}"/>
+                        <filter name="group_state" string="State" domain="[]" context="{'group_by': 'state'}"/>
                         <filter name="group_application_name" string="Application Name" domain="[]" context="{'group_by': 'external_app_name'}"/>
                     </group>
                 </search>
