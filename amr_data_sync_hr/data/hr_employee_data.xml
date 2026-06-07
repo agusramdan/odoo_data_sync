@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record model="external.data.sync.strategy" id="external_data_sync_strategy_intra_employee">
+            <field name="server_sync_id" ref="external_server_sync_intra_employee"/>
+            <field name="external_model">hr.employee</field>
+            <field name="external_context">{'__read_data_for_sync_external_application':True,'active_test': False}</field>
+            <field name="external_fields">id,name,nip,birthday,day_month_employee,work_email,mobile_phone,department_id,job_id,active,resource_id,date_of_join,no_bpjs_kesehatan,no_bpjstk,company_id,acting,point_allocation,exp_date_contract,employee_category,termination_date,hide_birthday,bank_name,nama_rekening,no_rekening,gender,image_url,previous_employee_id,departure_reason,is_cancel_terminate,dummy,no_ktp,no_npwp,ptkp,classification_job,spl_admin</field>
+<!--            <field name="external_fields">id,name,nip,birthday,day_month_employee,work_email,mobile_phone,department_id,job_id,resource_id,active,date_of_join,company_id,acting,exp_date_contract,classification_job,bank_name,gender,spl_admin,image_url,no_bpjs_kesehatan,no_bpjstk,hide_birthday,previous_employee_id,departure_reason,is_cancel_terminate,dummy,no_ktp,no_npwp,ptkp,point_allocation_id,bank_id,resign_date,jenis_kelamin,image_128</field>-->
+            <!-- department_id,job_id,resource_id,company_id,point_allocation_id,bank_id,resign_date,jenis_kelamin,image_128-->
+            <field name="sync_cron" eval="False"/>
+            <field name="strategy">external_push</field>
+            <field name="internal_id_same_as_external" eval="True"/>
+            <field name="internal_model">hr.employee</field>
+            <field name="internal_process_method">internal_process_for_employee</field>
+            <field name="internal_event_sync_done">external_data_sync_done</field>
+            <field name="internal_context">{'active_test': False}</field>
+        </record>
+
+    </data>
+</odoo>

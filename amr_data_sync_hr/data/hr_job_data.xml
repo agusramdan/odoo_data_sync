@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+    <data>
+        <record model="external.data.sync.strategy" id="external_data_sync_strategy_hr_job">
+            <field name="server_sync_id" ref="external_server_sync_intra_employee"/>
+            <field name="external_model">hr.job</field>
+            <field name="external_context">{'__read_data_for_sync_external_application':True,'active_test': False}</field>
+            <field name="external_fields">name,active,state,description,requirements,department_id,company_id</field>
+            <field name="sync_cron" eval="False"/>
+            <field name="internal_model">hr.job</field>
+            <field name="strategy">external_push</field>
+            <field name="internal_id_same_as_external" eval="True"/>
+<!--            <field name="internal_lookup_method">internal_lookup_for_job</field>-->
+<!--            <field name="internal_process_method">internal_process_for_job</field>-->
+            <field name="internal_context">{'active_test': False}</field>
+        </record>
+    </data>
+</odoo>
