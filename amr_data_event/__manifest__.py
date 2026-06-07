@@ -3,15 +3,13 @@
 
 {
     'name': "Internal Data Event",
-    'summary': """ 
-        """,
-    'description': """
-    """,
+    'summary': "Internal Data Event",
+    'description': "Internal Data Event",
     'author': "Agus Muhammad Ramdan",
     "license": "AGPL-3",
     'website': "https://agus.ramdan.tech",
     'category': 'tools',
-    'version': '13.0.0.0.2',
+    'version': '13.0.0.0.3',
     'depends': ['base'],
     # always loaded
     'data': [

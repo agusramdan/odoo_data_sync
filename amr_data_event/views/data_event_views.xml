@@ -28,20 +28,12 @@
         <field name="model">internal.data.event</field>
         <field name="arch" type="xml">
             <form string="Internal Data Event">
+                <!-- STATUS BAR -->
+                <header>
+                    <button name="send_events" type="object" string="Send Event" class="btn-primary" states="pending,error"/>
+                    <field name="state" widget="statusbar" statusbar_visible="pending,sent,error"/>
+                </header>
                 <sheet>
-
-                    <!-- STATUS BAR -->
-                    <header>
-                        <field name="state"
-                               widget="statusbar"
-                               statusbar_visible="pending,sent,error"/>
-                        <button name="send_events"
-                                type="object"
-                                string="Send Event"
-                                class="btn-primary"
-                                states="pending,error"/>
-                    </header>
-
                     <!-- BASIC INFO -->
                     <group>
                         <group string="Resource">
@@ -57,19 +49,21 @@
                     </group>
 
                     <!-- DETAIL -->
-                    <group string="Payload">
-                        <field name="changed_fields"
-                               placeholder="field1,field2"
-                               readonly="1"/>
-                    </group>
+                    <notebook>
+                        <page string="Change Field">
+                            <field name="changed_fields"
+                                   placeholder="field1,field2"
+                                   readonly="1"/>
+                        </page>
+                        <page string="Error"
 
+                               attrs="{'invisible': [('state','!=','error')]}">
+                            <field name="error_message"
+                                   readonly="1"
+                                   nolabel="1"/>
+                        </page>
+                    </notebook>
                     <!-- ERROR -->
-                    <group string="Error"
-                           attrs="{'invisible': [('state','!=','error')]}">
-                        <field name="error_message"
-                               readonly="1"
-                               nolabel="1"/>
-                    </group>
 
                 </sheet>
             </form>

@@ -25,6 +25,7 @@ class InternalDataSync(models.Model):
     fields_exclude = fields.Char(
         help="Comma separated field names to exclude."
     )
+    filter_expr = fields.Char("Filter Expression")
     log_create = fields.Boolean(default=True)
     log_write = fields.Boolean(default=True)
     log_unlink = fields.Boolean(default=True)

@@ -1,5 +1,8 @@
-from odoo import models, api
+
 import logging
+
+from odoo import models
+from odoo.tools.safe_eval import safe_eval
 
 _logger = logging.getLogger(__name__)
 
@@ -16,7 +19,6 @@ EXCLUDE_MODELS = {
     'res.groups',
     'res.company',
     'res.config.settings',
-    'user.delegate',
 
     # Messaging
     'mail.message',
@@ -41,7 +43,7 @@ EXCLUDE_PREFIXES = (
     'approval.',
     'antareja.',
     'notification.'
-    'user.delegate.'
+    'user.delegation.'
     'whatsapp.'
 )
 
@@ -126,9 +128,15 @@ class DataEventMixin(models.AbstractModel):
 
         if not config:
             return
-
-        changed = set(vals.keys()) - {'write_uid', 'write_date', '__last_update'}
-
+        changed = {}
+        if isinstance(vals,dict):
+            changed = set(vals.keys()) - {'write_uid', 'write_date', '__last_update'}
+        elif isinstance(vals, list):
+            changed = set(vals) - {'write_uid', 'write_date', '__last_update'}
+            _logger.debug("Vals is list %s . ",vals)
+        elif isinstance(vals, set):
+            changed = vals - {'write_uid', 'write_date', '__last_update'}
+            _logger.debug("Vals is set %s . ", vals)
         fields_exclude = config.get_fields_exclude()
         if fields_exclude:
             changed -= set(fields_exclude)
@@ -141,8 +149,20 @@ class DataEventMixin(models.AbstractModel):
         if not changed:
             return
 
+        filter_expr = config.filter_expr
+        filter_expr = filter_expr and filter_expr.strip()
+
+        if filter_expr:
+            records = self.browse()
+
+            for record in self:
+                if safe_eval(filter_expr, {"record": record}):
+                    records |= record
+        else:
+            records = self
+
         AuditEvent = self.env['internal.data.event'].sudo()
-        for rec in self:
+        for rec in records:
             data = {
                 'name': rec.display_name,
                 'res_model': rec._name,

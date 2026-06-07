@@ -24,7 +24,10 @@
                                 <field name="log_unlink"/>
                             </group>
                         </page>
-                        <page string="Field Filter">
+                        <page string="Filter">
+                            <group string="Record Filter">
+                                <field name="filter_expr"/>
+                            </group>
                             <group string="Field Filter">
                                 <field name="fields_include"
                                        placeholder="field1,field2,field3"/>
