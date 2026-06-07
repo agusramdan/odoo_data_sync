@@ -5,7 +5,6 @@ from odoo.addons.amr_jsonrpc.utils import savepoint
 
 import logging
 
-
 _logger = logging.getLogger(__name__)
 
 
@@ -20,11 +19,13 @@ class InternalDataSync(models.Model):
         'external.data.event', readonly=True,
         compute='_compute_last_data_event_id'
     )
+
     def _compute_last_data_event_id(self):
         for auth in self:
             auth.last_data_event_id = self.last_data_event_id.search(
                 [('server_id', '=', auth.id)], order='id desc', limit=1
             )
+
     @savepoint(rethrow=True)
     def fetch_event_data_change(self):
         auth = self.ensure_one()
@@ -38,7 +39,7 @@ class InternalDataSync(models.Model):
                     last_id = data['id']
                     res_model = data['res_model']
                     res_id = data['res_id']
-                    company = external_data_company.lookup_company(data.get('company_id'),auth)
+                    company = external_data_company.lookup_company(data.get('company_id'), auth)
                     strategies = auth.strategy_ids.filtered(lambda s: s.external_model == res_model)
                     if not strategies:
                         _logger.info("No strategy found for model %s, skipping data event ID %s", res_model, res_id)
@@ -60,12 +61,11 @@ class InternalDataSync(models.Model):
 
                 data_list = remote_model.search_read([('id', '>', last_id)], order='id asc', limit=10)
 
-
     def action_fetch_event_data_change(self):
         self.fetch_event_data_change()
 
     def cron_fetch_event_data_change(self):
-        server_list = self or self.search([('event_listener','=',True)])
+        server_list = self or self.search([('event_listener', '=', True)])
 
         for server in server_list:
             server.fetch_event_data_change()
