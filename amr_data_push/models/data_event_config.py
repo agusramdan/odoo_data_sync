@@ -11,7 +11,7 @@ class InternalDataSync(models.Model):
     _inherit = 'internal.data.event.config'
     _description = """
     """
-    audiences = fields.Char("Audiences")
+    audiences = fields.Char("Audiences", help="Service service.endpoint code to update data")
 
     def get_push_fields(self):
         config = self
@@ -29,4 +29,3 @@ class InternalDataSync(models.Model):
                 field_names &= set(fields_include)
 
         return list(field_names)
-
