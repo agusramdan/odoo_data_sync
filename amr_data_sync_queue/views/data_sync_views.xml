@@ -1,0 +1,16 @@
+<odoo>
+    <data>
+
+        <record id="external_data_sync_form" model="ir.ui.view">
+            <field name="name">external.data.sync.form</field>
+            <field name="model">external.data.sync</field>
+            <field name="inherit_id" ref="amr_data_sync.external_data_sync_form"/>
+            <field name="priority" eval="99" />
+            <field name="arch" type="xml">
+                <field name="need_get_data_json" position="after">
+                    <field name="on_queue"/>
+                </field>
+            </field>
+        </record>
+    </data>
+</odoo>
