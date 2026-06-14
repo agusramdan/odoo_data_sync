@@ -12,8 +12,8 @@
     "license": "AGPL-3",
     'website': "https://agus.ramdan.tech",
     'category': 'tools',
-    'version': '13.0.0.0.3',
-    'depends': ['base', 'mail', 'amr_jsonrpc', 'amr_data_sync'],
+    'version': '13.0.0.0.4',
+    'depends': ['base', 'mail', 'amr_data_sync'],
     # always loaded
     'data': [
         'security/ir.model.access.csv',

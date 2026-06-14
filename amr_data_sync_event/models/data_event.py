@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 
-from odoo.addons.amr_jsonrpc.utils import savepoint
+
 from odoo import models, fields
 import traceback
 import logging
@@ -39,7 +39,6 @@ class InternalDataSync(models.Model):
     ], default='pending', index=True)
     error_message = fields.Text()
 
-    @savepoint
     def write_error(self, stack_trace):
         error_data = {
             'error_message': stack_trace,
@@ -82,6 +81,4 @@ class InternalDataSync(models.Model):
                     'data_ids': [(6, 0, data_ids)]
                 })
         except Exception:
-            all_related_done = False
-            # todo clear cache odoo
             self.write_error(traceback.format_exc())

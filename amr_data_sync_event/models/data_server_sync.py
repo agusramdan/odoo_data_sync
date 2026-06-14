@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 
 from odoo import models, fields
-from odoo.addons.amr_jsonrpc.utils import savepoint
 
 import logging
+
 
 _logger = logging.getLogger(__name__)
 
@@ -26,7 +26,6 @@ class InternalDataSync(models.Model):
                 [('server_id', '=', auth.id)], order='id desc', limit=1
             )
 
-    @savepoint(rethrow=True)
     def fetch_event_data_change(self):
         auth = self.ensure_one()
         last_data_event_id = auth.last_data_event_id
