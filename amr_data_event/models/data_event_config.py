@@ -78,3 +78,20 @@ class InternalDataSync(models.Model):
             ('active', '=', True),
             ('log_unlink', '=', True),
         ], limit=1)
+
+    def action_snapshot(self):
+        changed = self.get_fields_include()
+        records = self.env[self.model_id.model].search([])
+        AuditEvent = self.env['internal.data.event'].sudo()
+        for rec in records:
+            data = {
+                'name': rec.display_name,
+                'res_model': rec._name,
+                'res_id': rec.id,
+                'operation': 'snapshot',
+                'changed_fields': ",".join(changed),
+            }
+            if 'company_id' in rec._fields:
+                data['company_id'] = int(rec.company_id)
+            event = AuditEvent.create(data)
+            event.send_events()

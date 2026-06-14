@@ -1,9 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- ========================= -->
-    <!-- TREE VIEW -->
-    <!-- ========================= -->
     <record id="view_internal_data_event_tree" model="ir.ui.view">
         <field name="name">internal.data.event.tree</field>
         <field name="model">internal.data.event</field>
@@ -20,9 +17,41 @@
         </field>
     </record>
 
-    <!-- ========================= -->
-    <!-- FORM VIEW -->
-    <!-- ========================= -->
+    <record id="view_internal_data_event_search" model="ir.ui.view">
+        <field name="name">internal.data.event.search</field>
+        <field name="model">internal.data.event</field>
+        <field name="arch" type="xml">
+            <search string="Search Internal Data Events">
+
+                <!-- Search Fields -->
+                <field name="res_model"/>
+                <field name="res_id"/>
+                <field name="company_id"/>
+
+                <!-- Filters -->
+                <filter name="filter_pending" string="Pending" domain="[('state','=','pending')]"/>
+                <filter name="filter_processing" string="Processing" domain="[('state','=','processing')]"/>
+                <filter name="filter_done" string="Done" domain="[('state','=','done')]"/>
+                <filter name="filter_failed" string="Failed" domain="[('state','=','failed')]"/>
+
+                <separator/>
+                <filter name="filter_create" string="Create" domain="[('operation','=','create')]"/>
+                <filter name="filter_write" string="Write" domain="[('operation','=','write')]"/>
+                <filter name="filter_unlink" string="Delete" domain="[('operation','=','unlink')]"/>
+
+                <!-- Group By -->
+                <group expand="0" string="Group By">
+                    <filter name="group_res_model" string="Model" context="{'group_by': 'res_model'}"/>
+                    <filter name="group_company" string="Company" context="{'group_by': 'company_id'}"/>
+                    <filter name="group_operation" string="Operation" context="{'group_by': 'operation'}"/>
+                    <filter name="group_state" string="State" context="{'group_by': 'state'}"/>
+                    <filter name="group_date" string="Date" context="{'group_by': 'event_datetime:day'}"/>
+                </group>
+
+            </search>
+        </field>
+    </record>
+
     <record id="view_internal_data_event_form" model="ir.ui.view">
         <field name="name">internal.data.event.form</field>
         <field name="model">internal.data.event</field>
@@ -70,9 +99,6 @@
         </field>
     </record>
 
-    <!-- ========================= -->
-    <!-- ACTION -->
-    <!-- ========================= -->
     <record id="action_internal_data_event" model="ir.actions.act_window">
         <field name="name">Internal Data Events</field>
         <field name="res_model">internal.data.event</field>

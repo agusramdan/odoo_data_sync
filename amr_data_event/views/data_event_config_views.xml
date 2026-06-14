@@ -7,6 +7,8 @@
         <field name="arch" type="xml">
             <form string="Internal Data Event Config">
                 <header>
+                    <button name="action_snapshot" type="object" string="Send Snapshot" class="btn-primary"/>
+
                     <field name="active" invisible="1"/>
                 </header>
                 <sheet>

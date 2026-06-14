@@ -110,7 +110,8 @@ class DataEventMixin(models.AbstractModel):
             }
             if 'company_id' in self._fields:
                 data['company_id'] = int(rec.company_id)
-            AuditEvent.create(data)
+            event = AuditEvent.create(data)
+            event.send_events()
 
     def _event_light_log_modified(self, vals):
         # safety
@@ -172,7 +173,8 @@ class DataEventMixin(models.AbstractModel):
             }
             if 'company_id' in self._fields:
                 data['company_id'] = int(rec.company_id)
-            AuditEvent.create(data)
+            event = AuditEvent.create(data)
+            event.send_events()
 
     def _event_light_log_unlink(self):
         # safety
@@ -202,4 +204,5 @@ class DataEventMixin(models.AbstractModel):
             }
             if 'company_id' in self._fields:
                 data['company_id'] = int(rec.company_id)
-            AuditEvent.create(data)
+            event = AuditEvent.create(data)
+            event.send_events()

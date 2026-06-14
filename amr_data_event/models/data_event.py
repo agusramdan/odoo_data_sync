@@ -24,13 +24,15 @@ class InternalDataSync(models.Model):
         ('create', 'Create'),
         ('write', 'Write'),
         ('unlink', 'Delete'),
+        ('snapshot', 'Snapshot'),
     ], required=True)
     changed_fields = fields.Char()
     state = fields.Selection([
         ('pending', 'Pending'),
         ('sent', 'Sent'),
+        ('queue', 'Queue'),
         ('error', 'Error'),
-    ], default='sent', index=True)
+    ], default='pending', index=True)
     error_message = fields.Text()
 
     def send_events(self):
