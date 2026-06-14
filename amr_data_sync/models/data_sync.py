@@ -7,7 +7,6 @@ import traceback
 from collections import defaultdict
 
 from odoo import _, api, fields, models, SUPERUSER_ID
-from odoo.addons.amr_jsonrpc.utils import savepoint
 from odoo.exceptions import UserError
 from odoo.tools import date_utils
 
@@ -190,31 +189,26 @@ class ExternalDataSync(models.Model):
                 return False
         return True
 
-    # @savepoint(rethrow=True)
     def get_related_data(self, field, value):
         related = self.related_ids.filtered(lambda r: r.name == field.name)
         if related:
             related.write({
                 'data_json': json.dumps(value)
             })
-        else:
-            _logger.warning("field with value cannot process %s, value",field,value)
-            return None
-        # elif self.sync_strategy_id and value:
-        #     parent_sync_strategy = self.sync_strategy_id
-        #     sync_strategy = self.sync_strategy_id.lookup_strategy(
-        #         field.comodel_name, parent_sync_strategy=parent_sync_strategy,
-        #         external_app_name=parent_sync_strategy.external_app_name
-        #     )
-        #     if sync_strategy:
-        #         external_data_sync_id = self
-        #         related = self.env['external.data.sync.related'].create_or_get_related(
-        #             external_data_sync_id, field.name, field.type, field_required=field.required,
-        #             related_sync_strategy_id=sync_strategy,
-        #             internal_model=field.comodel_name,
-        #             inverse_field=field.inverse_name if field.type == 'one2many' else None,
-        #             value=value
-        #         )
+        elif self.sync_strategy_id and value:
+            parent_sync_strategy = self.sync_strategy_id
+            sync_strategy = self.sync_strategy_id.lookup_strategy(
+                field.comodel_name, parent_sync_strategy=parent_sync_strategy,
+                external_app_name=parent_sync_strategy.external_app_name
+            )
+            if sync_strategy:
+                related = self.related_ids.create_or_get_related(
+                    self, field.name, field.type, field_required=field.required,
+                    related_sync_strategy_id=sync_strategy,
+                    internal_model=field.comodel_name,
+                    inverse_field=field.inverse_name if field.type == 'one2many' else None,
+                    value=value
+                )
         return related.get_data_relation()
 
     def data_from_external(self, item, sync_strategy, create_when_not_found=True,need_get_data_json=True):
@@ -302,7 +296,6 @@ class ExternalDataSync(models.Model):
 
         return existing
 
-    #@savepoint(rethrow=True)
     def prepare_input_external(self, item, **kwargs):
         parent_object = self
         sync_strategy = kwargs.get('sync_strategy') or self.sync_strategy_id
@@ -333,10 +326,10 @@ class ExternalDataSync(models.Model):
         self.sync_strategy_id.event_external_archived_done(internal_odoo, item, input_dict)
         self.write_archived_internal_odoo(internal_odoo, input_dict)
 
-    #@savepoint
     def write_done_internal_odoo(self, internal_odoo, payload=None):
         if internal_odoo:
             done_data = {
+                'error_info': "Done",
                 'external_deleted':False,
                 'external_archived': False,
                 'internal_odoo_id': internal_odoo.id,
@@ -384,7 +377,6 @@ class ExternalDataSync(models.Model):
             self.sync_strategy_id = sync_strategy
         return sync_strategy
 
-    # @savepoint(rethrow=True)
     def save_data(self, existing, item, input_dict):
         sync_strategy = self.sync_strategy_id
         if sync_strategy.internal_id_same_as_external and not existing:
@@ -394,6 +386,8 @@ class ExternalDataSync(models.Model):
             existing.write(input_dict)
         if not existing and self.is_create_able_from_external():
             _logger.info(f"Create {self.internal_model}")
+            if existing is None or existing is False or not isinstance(existing, models.BaseModel):
+                existing = sync_strategy.internal_model_object()
             if sync_strategy.internal_id_same_as_external:
                 internal_odoo_id = sync_strategy.get_internal_id_same_as_external(item)
                 input_dict['id'] = internal_odoo_id
@@ -467,6 +461,8 @@ class ExternalDataSync(models.Model):
                 input_dict = result_internal
 
             if not skip_save:
+                if existing is None or isinstance(existing, models.BaseModel):
+                    existing = ModelObject
                 existing = self.save_data(existing, item, input_dict)
 
             if existing:
@@ -539,23 +535,7 @@ class ExternalDataSync(models.Model):
     def dispatch_process(self,run_immediate=False):
         self.write({'state': 'process'})
         if run_immediate:
-            id_= self.id
-            with self.pool.cursor() as cr:
-                env = api.Environment(cr, self.env.uid, self.env.context)
-                rec = env[self._name].browse(id_)
-                try:
-                    rec.process_data()
-                    cr.commit()
-                except Exception:
-                    _logger.exception("Error rec %s", self)
-                    cr.rollback()
-                    rec = env[self._name].browse(id_)
-                    rec.write_error_safe({
-                        'error_info': traceback.format_exc(),
-                        'state': 'error',
-                        'last_error': fields.Datetime.now(),
-                        'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
-                    })
+            self.process_data()
 
     def cron_process_data(self, limit=1000):
         # def process_rec_id(id_):
@@ -655,7 +635,6 @@ class ExternalDataSync(models.Model):
             return model.with_context(active_test=False).browse(self.internal_odoo_id)
         return model
 
-    # @savepoint
     def process_field_after_create(self, existing):
         after_create = {}
         need_resolve = False

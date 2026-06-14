@@ -1,10 +1,15 @@
-from collections import defaultdict
 
-from psycopg2._psycopg import AsIs
 import inspect
+import logging
+
+from collections import defaultdict
+from psycopg2._psycopg import AsIs
 from odoo import SUPERUSER_ID,_
 from odoo.exceptions import UserError
 from odoo.tools import clean_context, attrgetter
+
+
+_logger = logging.getLogger(__name__)
 
 LOG_ACCESS_COLUMNS = ['create_uid', 'create_date', 'write_uid', 'write_date']
 
@@ -341,3 +346,23 @@ def ensure_external_fields(self, model_name):
         created_fields.append(IrModelFields.create(field_def))
 
     return created_fields
+
+
+def call_with_savepoint(self, method_name, args=None, kwargs=None, logger=_logger, rethrow=False):
+    """
+    Memanggil method pada object secara aman.
+
+    - method optional
+    - method_name harus string
+    - method harus callable
+    - args disesuaikan dengan signature
+    """
+
+    try:
+        with self.env.cr.savepoint():
+            return safe_call_method(self,method_name,args=args,kwargs=kwargs)
+    except Exception as e:
+        logger.warning("[SAFEPOINT] %s failed: %s", method_name, e, exc_info=True)
+        if rethrow:
+            raise
+    return None

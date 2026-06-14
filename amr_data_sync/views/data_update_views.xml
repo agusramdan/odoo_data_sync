@@ -15,6 +15,7 @@
                 <field name="state"/>
                 <field name="data_id"/>
                 <field name="strategy_id"/>
+                <field name="company_id"/>
             </tree>
         </field>
     </record>
@@ -35,9 +36,8 @@
                             <field name="name"/>
                             <field name="event_datetime"/>
                             <field name="operation"/>
-                            <field name="state" readonly="1"/>
+                            <field name="company_id"/>
                         </group>
-
                         <group>
                             <field name="data_id"/>
                             <field name="strategy_id"/>

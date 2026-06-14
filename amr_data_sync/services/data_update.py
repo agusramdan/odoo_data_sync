@@ -30,6 +30,14 @@ class DataUpdateService(models.AbstractModel):
         )
         if issuer:
             prepare_dict['strategy_id'] = strategy.id
+        data = payload.get('data') or {}
+        company_id = payload.get('company_id') or data.get('company_id')
+        if company_id and isinstance(company_id,list):
+            company_id = company_id[0]
+        if company_id:
+            external_company = self.env["external.data.company"].search([('server_sync_id','=',strategy.server_sync_id.id),('external_id','=',company_id)])
+            if external_company.company_id:
+                prepare_dict['company_id'] = external_company.company_id.id
         accept = data_update.create(prepare_dict)
         return accept
 
@@ -43,4 +51,3 @@ class DataUpdateService(models.AbstractModel):
             "data_accept": message.id,
             "status": "accepted",
         }
-

@@ -75,7 +75,7 @@ class ExternalDataMapping(models.Model):
         field_name = self.internal_field or self.key_name
         value = external_data.get(key_name)
         if self.mapping_strategy == 'parent':
-            related = self.env['external.data.sync.related'].get_relation(field_name, parent_data_sync)
+            related = self.env['external.data.sync.related'].get_relation_data(field_name, parent_data_sync)
             data_json=json.dumps(value)
             if related:
                 if data_json != related.data_json:
@@ -84,9 +84,11 @@ class ExternalDataMapping(models.Model):
                     })
             else:
                 related = self.env['external.data.sync.related'].create_parent(field_name,parent_data_sync,value)
+            if not value:
+                related.write({'state':'done'})
             return related.get_data_relation()
         elif self.mapping_strategy == 'many2one':
-            related = self.env['external.data.sync.related'].get_relation(field_name, parent_data_sync)
+            related = self.env['external.data.sync.related'].get_relation_data(field_name, parent_data_sync)
             data_json = json.dumps(value)
             if related:
                 if data_json != related.data_json:
@@ -95,9 +97,11 @@ class ExternalDataMapping(models.Model):
                     })
             else:
                 related = self.env['external.data.sync.related'].create_many2one(field_name, parent_data_sync, value,self.relation_strategy_id)
+            if not value:
+                related.write({'state':'done'})
             return related.get_data_relation()
         elif self.mapping_strategy == 'many2many':
-            related = self.env['external.data.sync.related'].get_relation(field_name, parent_data_sync)
+            related = self.env['external.data.sync.related'].get_relation_data(field_name, parent_data_sync)
             data_json = json.dumps(value)
             if related:
                 if data_json != related.data_json:
@@ -108,6 +112,8 @@ class ExternalDataMapping(models.Model):
                 related = self.env['external.data.sync.related'].create_many2many(
                     field_name, parent_data_sync, value,self.relation_strategy_id
                 )
+            if not value:
+                related.write({'state':'done'})
             return related.get_data_relation()
             # related_external_data_sync_id = self.env['external.data.sync'].get_or_create(
             #     external_data, self.relation_strategy_id

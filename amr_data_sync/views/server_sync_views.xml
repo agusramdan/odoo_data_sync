@@ -5,43 +5,70 @@
             <field name="model">external.server.sync</field>
             <field name="priority" eval="99" />
             <field name="arch" type="xml">
-                <form string="sync">
+                <form string="Service Endpoint">
                     <header>
-<!--                        <button name="action_get_db_name" type="object" string="Get DB Name" class="oe_highlight"  />-->
-<!--                        <button name="action_authenticate" type="object" string="Authenticate" class="oe_highlight"  />-->
+                        <button name="action_test_connection" type="object" string="Test Connection" class="oe_highlight" />
+                        <field name="active" invisible="1"/>
                     </header>
                     <sheet>
+                        <div class="oe_title">
+                            <label for="name"/>
+                            <h1>
+                                <field name="name"/>
+                            </h1>
+                        </div>
+
                         <group>
                             <group>
-                                <field name="name"/>
+                                <field name="app_name" />
+                                <field name="timeout"/>
                             </group>
                             <group>
-                                <field name="app_name"/>
-                                <field name="code"/>
+                                <field name="credential_id" options="{'no_create_edit': False}" />
                             </group>
                         </group>
+
                         <notebook>
-                            <page string="Server Info" name="page_info">
+                            <page string="Endpoint">
                                 <group>
-                                    <group>
-                                        <field name="base_url"/>
-                                        <field name="auth_type"/>
-                                        <field name="path" attrs="{'invisible':[('auth_type','not in',['credential', 'odoo-rcp','jwt-odoo-rcp'])]}"/>
-                                        <field name="credential_id" attrs="{'invisible':[('auth_type','!=','credential')]}"/>
-                                    </group>
-                                    <group attrs="{'invisible':[('auth_type','not in',['basic','odoo-rcp','jwt-odoo-rcp'])]}">
-                                        <field name="odoo_server_db" />
-                                        <field name="odoo_server_uid" />
-                                    </group>
-                                    <group attrs="{'invisible':[('auth_type','not in',['basic','odoo-rcp','jwt-odoo-rcp'])]}">
-                                        <field name="username" />
-                                        <field name="password" attrs="{'invisible':[('auth_type','not in',['basic','odoo-rcp'])]}"/>
-                                    </group>
-                                    <group attrs="{'invisible':[('auth_type','not in',['rest-token','token','jwt-odoo-rcp'])]}">
-                                        <field name="token_in" attrs="{'invisible':[('auth_type','not in',['rest-token','token'])]}"/>
-                                        <field name="token_key" attrs="{'invisible':[('auth_type','not in',['rest-token','token'])]}"/>
-                                        <field name="access_token" />
-                                    </group>
+                                    <field name="base_url" string="Base Url" attrs="{'invisible':[('config_param_name','in',['',False])]}"/>
+                                    <field name="base_url_value" string="Base Url" attrs="{'invisible':[('config_param_name','not in',['',False])]}" placeholder="https://employee.company.com"/>
+                                    <field name="config_param_name"/>
+                                    <button string="Edit" type="object" name="open_config_parameter" attrs="{'invisible':[('config_param_name','in',['',False])]}"/>
+                                </group>
+                            </page>
+
+                            <page string="Help">
+                                <group string="Application Name">
+                                    <div>
+                                        identifier used by service.client.
+                                    </div>
+                                </group>
+                                 <group string="Config Param">
+                                    <div>
+                                        Will get data endpoint resource server using config param
+                                        https://employee.company.com
+                                    </div>
+                                </group>
+                                <group string="Base URL">
+                                    <div>
+                                        if not using get data endpoint resource server using config param
+                                        Example:
+                                        https://employee.company.com
+                                    </div>
+                                </group>
+
+                                <group string="Credential">
+                                    <div>
+                                        Authentication configuration
+                                        used when accessing this
+                                        service.
+                                    </div>
+                                </group>
+                                <group string="Timeout">
+                                    <div>
+                                        Request timeout in seconds.
+                                    </div>
                                 </group>
                             </page>
                         </notebook>
@@ -57,9 +84,8 @@
             <field name="arch" type="xml">
                 <tree >
                     <field name="name"/>
+                    <field name="app_name"/>
                     <field name="base_url"/>
-                    <field name="odoo_server_db"/>
-                    <field name="auth_type"/>
                 </tree>
             </field>
         </record>

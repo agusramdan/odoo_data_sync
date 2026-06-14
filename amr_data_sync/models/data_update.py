@@ -4,7 +4,6 @@ import json
 import traceback
 import logging
 
-from odoo.addons.amr_jsonrpc.utils import savepoint
 from odoo import api, models, fields
 
 _logger = logging.getLogger(__name__)
@@ -16,6 +15,7 @@ class ExternalDataUpdate(models.Model):
     _order = 'id desc'
     name = fields.Char()
     data_id = fields.Many2one('external.data.sync')
+    company_id = fields.Many2one('res.company')
     strategy_id = fields.Many2one('external.data.sync.strategy')
     res_model = fields.Char('Model External', required=True, index=True,)
     res_id = fields.Integer('ID External', required=True, index=True)
@@ -45,12 +45,12 @@ class ExternalDataUpdate(models.Model):
         payload = dict(payload)
 
         data = payload.get('data') or {}
-        display_name = payload.get('display_name') or payload.get('name')
+        display_name = payload.get('display_name') or data.get('display_name')  or  payload.get('name') or data.get('display_name')
         res_id = payload.get('res_id') or data.get('id')
         res_model =  payload.get('res_model')
         operation = payload.get('operation')
         event_datetime = payload.get('event_datetime')
-        if operation in ['create','update','write','snapshot']:
+        if operation != "unlink":
             operation='upsert'
         data['id']=res_id
         data['display_name'] =display_name
@@ -61,7 +61,7 @@ class ExternalDataUpdate(models.Model):
             "raw_payload": raw_payload,
             "operation": operation,
             "event_datetime":event_datetime,
-            "data_payload": json.dumps(payload)
+            "data_payload": json.dumps(data)
         }
 
     def dispatch_process(self):
@@ -78,7 +78,10 @@ class ExternalDataUpdate(models.Model):
                         ('sync_strategy_id', '=', self.strategy_id.id)
                     ]
                     data = self.data_id.search(domain)
-                    data.write({'external_deleted': True, 'deleted_datetime': self.event_datetime})
+                    update = {'external_deleted': True, 'deleted_datetime': self.event_datetime}
+                    if self.company_id:
+                        update['company_id'] = self.company_id.id
+                    data.write(update)
                 else:
                     data = self.data_id.data_from_external(
                         item, self.strategy_id, create_when_not_found=True, need_get_data_json=False

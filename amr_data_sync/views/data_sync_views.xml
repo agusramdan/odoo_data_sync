@@ -76,7 +76,12 @@
                                     <tree>
                                         <field name="name"/>
                                         <field name="field_type" />
-                                        <field name="internal_model"/>
+                                        <field name="sync_strategy_id"/>
+                                        <field name="related_external_data_sync_id"  string="Related" optional="hide"/>
+                                        <field name="mandatory_before_create" optional="hide"/>
+                                        <field name="next_processing_datetime"  string="Related" optional="hide"/>
+                                        <field name="internal_model"  string="Related" optional="hide"/>
+                                        <field name="inverse_field"  string="Related" optional="hide"/>
                                         <field name="state" />
                                     </tree>
                                 </field>
