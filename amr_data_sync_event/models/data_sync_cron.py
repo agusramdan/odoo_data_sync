@@ -44,9 +44,19 @@ class ExternalDataSyncCron(models.Model):
         self.sync_strategy_id.action_sync_now()
 
     def cron_sync_from_server(self):
-        data_sync_models = self or self.search([
-            ('server_sync_id.event_listener','=',False),
-            ('strategy', 'in', ['external_cud', 'external_cu', 'external_create']),
+
+        if self:
+            super(ExternalDataSyncCron, self).cron_sync_from_server()
+            return
+
+        data_sync_models = self.search([
+            ('strategy', 'in', ['external_cud']),
             '|', ('next_sync_datetime', '=', False), ('next_sync_datetime', '<=', fields.Datetime.now())
         ], order='next_sync_datetime asc')
-        super(ExternalDataSyncCron,data_sync_models).cron_sync_from_server()
+        data_sync_models and super(ExternalDataSyncCron, data_sync_models).cron_sync_from_server()
+        data_sync_models = self.search([
+            ('server_sync_id.event_listener','=',False),
+            ('strategy', 'in', ['external_cu', 'external_create']),
+            '|', ('next_sync_datetime', '=', False), ('next_sync_datetime', '<=', fields.Datetime.now())
+        ], order='next_sync_datetime asc')
+        data_sync_models and super(ExternalDataSyncCron,data_sync_models).cron_sync_from_server()

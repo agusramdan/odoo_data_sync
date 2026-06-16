@@ -37,10 +37,10 @@
                     <header>
                         <field name="state"
                                widget="statusbar"
-                               statusbar_visible="pending,sent,error"/>
-                        <button name="send_events"
+                               statusbar_visible="pending,process,error"/>
+                        <button name="action_process"
                                 type="object"
-                                string="Send Event"
+                                string="Process"
                                 class="btn-primary"
                                 states="pending,error"/>
                     </header>

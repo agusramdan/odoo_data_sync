@@ -10,7 +10,7 @@ _logger = logging.getLogger(__name__)
 
 class InternalDataSync(models.Model):
     _name = 'external.data.event'
-    _description = "Internal data event yang akan assess oleh external app"
+    _description = "External Data Event yang akan di update ke Internal"
     _order = 'id desc'
 
     server_id = fields.Many2one(
@@ -67,18 +67,21 @@ class InternalDataSync(models.Model):
                         ]
                         data = self.data_ids.search(domain)
                         data.write({'external_deleted': True, 'deleted_datetime': self.event_datetime})
+                        data.validate_json_data_for_delete()
                     else:
                         data = self.data_ids.data_from_external(
                             item, sync_strategy, create_when_not_found=True
                         )
-
+                        # update company ensure same
+                        if data and self.company_id and data.company_id.id != self.company_id:
+                            data.write({'company_id', self.company_id.id})
                     data and data_ids.extend(data.ids)
-                # for strategy in self.strategy_ids:
-                #     strategy.process_data_event(self)
-                # self.state = 'done'
                 self.write({
                     'state': 'done',
                     'data_ids': [(6, 0, data_ids)]
                 })
         except Exception:
             self.write_error(traceback.format_exc())
+
+    def action_process(self):
+        self.process()
