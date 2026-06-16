@@ -3,6 +3,7 @@ import inspect
 import logging
 
 from collections import defaultdict
+
 from psycopg2._psycopg import AsIs
 from odoo import SUPERUSER_ID,_
 from odoo.exceptions import UserError

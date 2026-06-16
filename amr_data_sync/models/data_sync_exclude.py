@@ -48,7 +48,7 @@ Model untuk menyimpan konfigurasi exclude field atau model
         for exclude in self.search([('exclude', '=', 'fields'), ('model', '=', model_name), ('active', '=', True)]):
             try:
                 if exclude.model in env and exclude.fields:
-                    exclude_fields.extend(exclude.fields.sprit(','))
+                    exclude_fields.extend(exclude.fields.split(','))
             except Exception as e:
                 _logger.error(f"Error evaluating exclude fields for model: {e}")
                 continue

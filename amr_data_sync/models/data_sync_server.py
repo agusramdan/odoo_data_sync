@@ -23,4 +23,4 @@ class ExternalServerSync(models.Model):
         return self.base_url
 
     def create_remote_model(self, external_model, **kwargs):
-        return self.env['service.client'].get_remote_object(self, external_model)
+        return self.env['service.client'].get_remote_object(self, external_model, **kwargs)

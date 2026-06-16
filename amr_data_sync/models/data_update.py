@@ -86,6 +86,10 @@ class ExternalDataUpdate(models.Model):
                     data = self.data_id.data_from_external(
                         item, self.strategy_id, create_when_not_found=True, need_get_data_json=False
                     )
+                    # update company ensure same
+                    if data and self.company_id:
+                        data.write({'company_id', self.company_id.id})
+                    _logger.info("Without Company %s .",data)
                 data.dispatch_process()
                 self.write({
                     'state': 'done',
