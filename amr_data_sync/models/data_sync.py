@@ -154,15 +154,14 @@ class ExternalDataSync(models.Model):
                 'data_json': json.dumps(json_data)
             })
             _logger.info("Deleter")
-            return {'active' : False}
-
+            return {'active': False}
 
     def validate_json_data_for_delete(self):
         self.ensure_one()
         json_data = self.get_external_one_data()
         if not json_data:
-            self.external_deleted=True
-            self.action_archive_internal_odoo(self.get_internal_object(),{},{})
+            self.external_deleted = True
+            self.action_archive_internal_odoo(self.get_internal_object(), {}, {})
             return True
 
         return False
@@ -177,15 +176,15 @@ class ExternalDataSync(models.Model):
 
     def is_mandatory_related_done(self):
         for r in self.related_ids:
-            if r.mandatory_before_create and r.state not in ['need_resolve','done']:
-                _logger.info("field mandatory [%s] , state %s ",r.name,r.state)
+            if r.mandatory_before_create and r.state not in ['need_resolve', 'done']:
+                _logger.info("field mandatory [%s] , state %s ", r.name, r.state)
                 return False
         return True
 
     def is_all_related_done(self):
         for r in self.related_ids:
-            if r.state not in ['need_resolve','done']:
-                _logger.info("field %s , state %s ",r.name,r.state)
+            if r.state not in ['need_resolve', 'done']:
+                _logger.info("field %s , state %s ", r.name, r.state)
                 return False
         return True
 
@@ -211,7 +210,7 @@ class ExternalDataSync(models.Model):
                 )
         return related.get_data_relation()
 
-    def data_from_external(self, item, sync_strategy, create_when_not_found=True,need_get_data_json=True):
+    def data_from_external(self, item, sync_strategy, create_when_not_found=True, need_get_data_json=True):
         if not sync_strategy:
             raise UserError("Sync Strategy Not found")
         external_odoo_id = item.get('id')
@@ -319,8 +318,8 @@ class ExternalDataSync(models.Model):
     def is_create_able_from_external(self):
         return self.sync_strategy_id.is_create_able_from_external()
 
-    def action_archive_internal_odoo(self,internal_odoo, item, input_dict):
-        _logger.info("action_archive data %s %s.", self.internal_odoo_id ,internal_odoo)
+    def action_archive_internal_odoo(self, internal_odoo, item, input_dict):
+        _logger.info("action_archive data %s %s.", self.internal_odoo_id, internal_odoo)
         internal_odoo and internal_odoo.action_archive()
         _logger.info("Related Done Process after sync done")
         self.sync_strategy_id.event_external_archived_done(internal_odoo, item, input_dict)
@@ -330,7 +329,7 @@ class ExternalDataSync(models.Model):
         if internal_odoo:
             done_data = {
                 'error_info': "Done",
-                'external_deleted':False,
+                'external_deleted': False,
                 'external_archived': False,
                 'internal_odoo_id': internal_odoo.id,
                 'state': 'done',
@@ -351,7 +350,7 @@ class ExternalDataSync(models.Model):
             'archived_datetime': fields.Datetime.now(),
             'last_success': fields.Datetime.now(),
             'last_processing_datetime': fields.Datetime.now(),
-            'payload_json':json.dumps(payload, default=date_utils.json_default)
+            'payload_json': json.dumps(payload, default=date_utils.json_default)
         }
         self.write(done_data)
 
@@ -478,7 +477,7 @@ class ExternalDataSync(models.Model):
                     _logger.info("Delay proses data karena masih ada related data yang belum selesai. (%s) [%s] %s",
                                  self.internal_model, self.external_model, str(self.external_odoo_id)
                                  )
-                    self.write({'state': 'need_resolve','error_info': "need_resolve"})
+                    self.write({'state': 'need_resolve', 'error_info': "need_resolve"})
 
             else:
                 _logger.info(f"No update or Create {item.get('id')}")
@@ -500,7 +499,7 @@ class ExternalDataSync(models.Model):
             error_data['payload_json'] = json.dumps(payload, default=date_utils.json_default)
         self.write_error_safe(error_data)
 
-    def write_error_safe(self,error_data,using_pool=False):
+    def write_error_safe(self, error_data, using_pool=False):
 
         if using_pool:
             _logger.info("write_error_safe using_pool %s .", self)
@@ -532,52 +531,14 @@ class ExternalDataSync(models.Model):
         self.ensure_one()
         self.data_json = json.dumps(self.get_external_one_data())
 
-    def dispatch_process(self,run_immediate=False):
+    def dispatch_process(self, run_immediate=False):
         self.write({'state': 'process'})
         if run_immediate:
-            self.process_data()
+            self.process_with_handel_error()
 
     def cron_process_data(self, limit=1000):
-        # def process_rec_id(id_):
-        #     with self.pool.cursor() as cr:
-        #         env = api.Environment(cr, self.env.uid, self.env.context)
-        #         rec = env[self._name].browse(id_)
-        #         try:
-        #             rec.process_data()
-        #             cr.commit()
-        #         except Exception :
-        #             _logger.exception("Error rec %s", rec_id)
-        #             cr.rollback()
-        #             rec = env[self._name].browse(id_)
-        #             rec.write_error_safe({
-        #                 'error_info': traceback.format_exc(),
-        #                 'state': 'error',
-        #                 'last_error': fields.Datetime.now(),
-        #                 'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
-        #             })
-        # def process_related_id(id_):
-        #     with self.pool.cursor() as cr:
-        #         env = api.Environment(cr, self.env.uid, self.env.context)
-        #         rec = env['external.data.sync.related'].browse(id_)
-        #         try:
-        #             rec.process_data()
-        #             if rec.state != 'done' or not rec.external_data_sync_id:
-        #                 rec.write({
-        #                     'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
-        #                 })
-        #             cr.commit()
-        #         except Exception :
-        #             _logger.exception("Error rec %s", rec_id)
-        #             cr.rollback()
-        #             rec = env[self._name].browse(id_)
-        #             rec.write_error_safe({
-        #                 'error_info': traceback.format_exc(),
-        #                 'state': 'error',
-        #                 'last_error': fields.Datetime.now(),
-        #                 'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
-        #             })
         limit_time = fields.Datetime.now() + datetime.timedelta(minutes=10)
-        records  = self.search(
+        records = self.search(
             [('need_get_data_json', '=', True)],
             limit=limit, order='next_processing_datetime asc,last_processing_datetime asc, id '
         )
@@ -585,14 +546,14 @@ class ExternalDataSync(models.Model):
             rec.dispatch_process(True)
             if fields.Datetime.now() > limit_time:
                 break
-        records =self.search(
+        records = self.search(
             [('state', '!=', 'done'),
              '|',
              ('next_processing_datetime', '<=', fields.Datetime.now()),
              ('next_processing_datetime', '=', False)],
             limit=limit, order='next_processing_datetime asc,last_processing_datetime asc, id '
         )
-        for rec in records :
+        for rec in records:
             rec.dispatch_process(True)
             if fields.Datetime.now() > limit_time:
                 break
@@ -603,23 +564,13 @@ class ExternalDataSync(models.Model):
              ('next_processing_datetime', '<=', fields.Datetime.now()),
              ('next_processing_datetime', '=', False)],
             order='next_processing_datetime', limit=limit, )
-        external_data_sync = self.browse()
         limit_time = fields.Datetime.now() + datetime.timedelta(minutes=10)
 
         for rec in sync_related:
             rec.dispatch_process(True)
-            # process_related_id(t.id)
-            # if t.state == 'done' and t.external_data_sync_id:
-            #     external_data_sync |= t.external_data_sync_id
 
             if fields.Datetime.now() > limit_time:
                 break
-        # limit_time = fields.Datetime.now() + datetime.timedelta(minutes=10)
-        # for t in external_data_sync:
-        #     process_rec_id(t.id)
-        #
-        #     if fields.Datetime.now() > limit_time:
-        #         break
 
         return True
 
@@ -629,7 +580,7 @@ class ExternalDataSync(models.Model):
     def get_internal_object(self, model=None):
         if not isinstance(model, models.BaseModel) and self.sync_strategy_id:
             model = self.sync_strategy_id.internal_model_object()
-        if not isinstance(model, models.BaseModel)  and self.internal_model:
+        if not isinstance(model, models.BaseModel) and self.internal_model:
             model = self.env[self.internal_model]
         if isinstance(model, models.BaseModel):
             return model.with_context(active_test=False).browse(self.internal_odoo_id)
@@ -798,9 +749,9 @@ class ExternalDataSync(models.Model):
 
     def action_build_payload(self):
         item = self.get_json_data_for_create()
-        _logger.info("get_json_data_for_create %s ",item)
+        _logger.info("get_json_data_for_create %s ", item)
         input_dict = self.prepare_input_external(item)
-        _logger.info("prepare_input_external %s ",input_dict)
+        _logger.info("prepare_input_external %s ", input_dict)
         self.payload_json = json.dumps(input_dict, default=date_utils.json_default)
 
     def data_from_external_id(self, external_odoo_id, sync_strategy):
@@ -836,3 +787,16 @@ class ExternalDataSync(models.Model):
             existing = self.create([input_dict])[0]
 
         return existing
+
+    def process_with_handel_error(self):
+        try:
+            with self.env.cr.savepoint():
+                self.process_data()
+        except Exception:
+            _logger.exception("Error rec %s", self)
+            self.write_error_safe({
+                'error_info': traceback.format_exc(),
+                'state': 'error',
+                'last_error': fields.Datetime.now(),
+                'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
+            })
