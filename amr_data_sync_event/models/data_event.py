@@ -74,7 +74,7 @@ class InternalDataSync(models.Model):
                         )
                         # update company ensure same
                         if data and self.company_id and data.company_id.id != self.company_id:
-                            data.write({'company_id', self.company_id.id})
+                            data.write({'company_id': self.company_id.id})
                     data and data_ids.extend(data.ids)
                 self.write({
                     'state': 'done',

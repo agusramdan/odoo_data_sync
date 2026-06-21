@@ -1,9 +1,78 @@
 <?xml version="1.0" encoding="utf-8"?>
 <odoo>
 
-    <!-- ========================= -->
-    <!-- TREE VIEW -->
-    <!-- ========================= -->
+    <record id="view_external_data_event_search" model="ir.ui.view">
+        <field name="name">external.data.event.search</field>
+        <field name="model">external.data.event</field>
+        <field name="arch" type="xml">
+            <search string="Search External Data Events">
+
+                <!-- Search Fields -->
+                <field name="server_id"/>
+                <field name="res_model"/>
+                <field name="res_id"/>
+                <field name="company_id"/>
+                <field name="operation"/>
+                <field name="state"/>
+
+                <!-- Filters -->
+                <separator/>
+
+                <filter name="state_draft"
+                        string="Draft"
+                        domain="[('state', '=', 'draft')]"/>
+
+                <filter name="state_processing"
+                        string="Processing"
+                        domain="[('state', '=', 'processing')]"/>
+
+                <filter name="state_done"
+                        string="Done"
+                        domain="[('state', '=', 'done')]"/>
+
+                <filter name="state_failed"
+                        string="Failed"
+                        domain="[('state', '=', 'failed')]"/>
+
+                <separator/>
+
+                <filter name="create_today"
+                        string="Today"
+                        domain="[('event_datetime', '&gt;=', context_today().strftime('%%Y-%%m-%%d 00:00:00'))]"/>
+
+                <!-- Group By -->
+                <group expand="0" string="Group By">
+
+                    <filter name="group_server"
+                            string="Server"
+                            context="{'group_by': 'server_id'}"/>
+
+                    <filter name="group_company"
+                            string="Company"
+                            context="{'group_by': 'company_id'}"/>
+
+                    <filter name="group_model"
+                            string="Model"
+                            context="{'group_by': 'res_model'}"/>
+
+                    <filter name="group_operation"
+                            string="Operation"
+                            context="{'group_by': 'operation'}"/>
+
+                    <filter name="group_state"
+                            string="State"
+                            context="{'group_by': 'state'}"/>
+
+                    <filter name="group_date"
+                            string="Event Date"
+                            context="{'group_by': 'event_datetime:day'}"/>
+
+                </group>
+
+            </search>
+        </field>
+    </record>
+
     <record id="view_external_data_event_tree" model="ir.ui.view">
         <field name="name">external.data.event.tree</field>
         <field name="model">external.data.event</field>
@@ -23,28 +92,23 @@
         </field>
     </record>
 
-    <!-- ========================= -->
-    <!-- FORM VIEW -->
-    <!-- ========================= -->
     <record id="view_external_data_event_form" model="ir.ui.view">
         <field name="name">external.data.event.form</field>
         <field name="model">external.data.event</field>
         <field name="arch" type="xml">
             <form string="External Data Event">
+                <!-- STATUS BAR -->
+                <header>
+                    <field name="state"
+                           widget="statusbar"
+                           statusbar_visible="pending,process,error"/>
+                    <button name="action_process"
+                            type="object"
+                            string="Process"
+                            class="btn-primary"
+                            states="pending,error"/>
+                </header>
                 <sheet>
-
-                    <!-- STATUS BAR -->
-                    <header>
-                        <field name="state"
-                               widget="statusbar"
-                               statusbar_visible="pending,process,error"/>
-                        <button name="action_process"
-                                type="object"
-                                string="Process"
-                                class="btn-primary"
-                                states="pending,error"/>
-                    </header>
-
                     <!-- BASIC INFO -->
                     <group>
                         <group string="Resource">
