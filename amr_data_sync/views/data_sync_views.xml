@@ -95,6 +95,9 @@
                             <page string="Error Log">
                                 <field name="error_info" readonly="1"/>
                             </page>
+                            <page string="History Data Update">
+                                <field name="history_data_update_ids" readonly="1"/>
+                            </page>
                         </notebook>
                     </sheet>
                 </form>

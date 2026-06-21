@@ -79,6 +79,11 @@ class ExternalDataSync(models.Model):
         help="Related data linked to this external data sync record."
     )
 
+    history_data_update_ids = fields.One2many(
+        'external.data.update', 'data_id',
+        string='History External Data Update',
+    )
+
     def get_external_application_name(self):
         return self.external_app_name or (self.server_sync_id and self.server_sync_id.get_application_name()) or None
 
@@ -531,6 +536,19 @@ class ExternalDataSync(models.Model):
         self.ensure_one()
         self.data_json = json.dumps(self.get_external_one_data())
 
+    def process_with_handel_error(self):
+        try:
+            with self.env.cr.savepoint():
+                self.process_data()
+        except :
+            _logger.exception("Error rec %s", self)
+            self.write_error_safe({
+                'error_info': traceback.format_exc(),
+                'state': 'error',
+                'last_error': fields.Datetime.now(),
+                'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
+            })
+
     def dispatch_process(self, run_immediate=False):
         self.write({'state': 'process'})
         if run_immediate:
@@ -568,7 +586,6 @@ class ExternalDataSync(models.Model):
 
         for rec in sync_related:
             rec.dispatch_process(True)
-
             if fields.Datetime.now() > limit_time:
                 break
 
@@ -787,16 +804,3 @@ class ExternalDataSync(models.Model):
             existing = self.create([input_dict])[0]
 
         return existing
-
-    def process_with_handel_error(self):
-        try:
-            with self.env.cr.savepoint():
-                self.process_data()
-        except Exception:
-            _logger.exception("Error rec %s", self)
-            self.write_error_safe({
-                'error_info': traceback.format_exc(),
-                'state': 'error',
-                'last_error': fields.Datetime.now(),
-                'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
-            })

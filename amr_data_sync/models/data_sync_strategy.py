@@ -72,6 +72,7 @@ class ExternalDataSyncStrategy(models.Model):
         ('external_cu', 'Create Update'),
         ('external_create', 'Create Only'),
         ('external_update', 'Update Only'),
+        ('external_event', 'External Event'),
         ('external_push', 'External Push')
     ], help="""
     Strategy
@@ -245,16 +246,16 @@ class ExternalDataSyncStrategy(models.Model):
         return self.server_sync_id or self.server_sync_id.search([('app_name', '=', self.external_app_name)], limit=1)
 
     def is_delete_able_from_external(self):
-        return self.strategy in ['external_push', 'external_cud']
+        return self.strategy in ['external_event', 'external_push', 'external_cud']
 
     def is_update_able_from_external(self):
-        return self.strategy in ['external_push', 'external_cud', 'external_cu', 'external_update']
+        return self.strategy in ['external_event', 'external_push', 'external_cud', 'external_cu', 'external_update']
 
     def is_update_only_from_external(self):
-        return self.strategy in ['external_push', 'external_update']
+        return self.strategy in ['external_event', 'external_push', 'external_update']
 
     def is_create_able_from_external(self):
-        return self.strategy in ['external_push', 'external_cud', 'external_cu', 'external_create']
+        return self.strategy in ['external_event', 'external_push', 'external_cud', 'external_cu', 'external_create']
 
     def get_include_fields(self):
         include_fields = []

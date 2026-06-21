@@ -14,10 +14,10 @@ class ExternalDataUpdate(models.Model):
     _description = "Accept Data From external"
     _order = 'id desc'
     name = fields.Char()
-    data_id = fields.Many2one('external.data.sync')
+    data_id = fields.Many2one('external.data.sync', ondelete='set null')
     company_id = fields.Many2one('res.company')
-    strategy_id = fields.Many2one('external.data.sync.strategy')
-    res_model = fields.Char('Model External', required=True, index=True,)
+    strategy_id = fields.Many2one('external.data.sync.strategy', ondelete='set null')
+    res_model = fields.Char('Model External', required=True, index=True, )
     res_id = fields.Integer('ID External', required=True, index=True)
     event_datetime = fields.Datetime(default=fields.Datetime.now)
     operation = fields.Selection([
@@ -28,16 +28,16 @@ class ExternalDataUpdate(models.Model):
         ('accept', 'Accept'),
         ('process', 'Process'),
         ('error', 'Error'),
+        ('out_off_date', 'Out Off Date'),
         ('done', 'Done'),
     ], default='accept', index=True, readonly=True)
     error_message = fields.Text()
-    raw_payload=fields.Text()
+    raw_payload = fields.Text()
     data_payload = fields.Text()
 
     def action_process(self):
         self.ensure_one()
         self.process_data()
-
 
     @api.model
     def prepare_data_update(self, payload):
@@ -45,22 +45,23 @@ class ExternalDataUpdate(models.Model):
         payload = dict(payload)
 
         data = payload.get('data') or {}
-        display_name = payload.get('display_name') or data.get('display_name')  or  payload.get('name') or data.get('display_name')
+        display_name = payload.get('display_name') or data.get('display_name') or payload.get('name') or data.get(
+            'display_name')
         res_id = payload.get('res_id') or data.get('id')
-        res_model =  payload.get('res_model')
+        res_model = payload.get('res_model')
         operation = payload.get('operation')
         event_datetime = payload.get('event_datetime')
         if operation != "unlink":
-            operation='upsert'
-        data['id']=res_id
-        data['display_name'] =display_name
+            operation = 'upsert'
+        data['id'] = res_id
+        data['display_name'] = display_name
         return {
             "name": display_name,
             "res_id": res_id,
             "res_model": res_model,
             "raw_payload": raw_payload,
             "operation": operation,
-            "event_datetime":event_datetime,
+            "event_datetime": event_datetime,
             "data_payload": json.dumps(data)
         }
 
@@ -88,8 +89,21 @@ class ExternalDataUpdate(models.Model):
                     )
                     # update company ensure same
                     if data and self.company_id:
-                        data.write({'company_id', self.company_id.id})
-                    _logger.info("Without Company %s .",data)
+                        data.write({'company_id': self.company_id.id})
+                    write_date = item.get('write_date')
+                    if write_date:
+                        if isinstance(write_date, str):
+                            write_date = fields.Datetime.to_datetime(write_date)
+                        if data.external_last_update and data.external_last_update > write_date:
+                            self.write({
+                                'state': 'out_off_date',
+                                'data_id': data.id,
+                                'error_message': "Data out off date: external_last_update %s , current write_date %s ." % (
+                                data.external_last_update, write_date)
+                            })
+                            return
+                        data.write({'external_last_update': write_date})
+                    _logger.info("Without Company %s .", data)
                 data.dispatch_process()
                 self.write({
                     'state': 'done',
@@ -97,4 +111,4 @@ class ExternalDataUpdate(models.Model):
                     'error_message': False
                 })
         except Exception:
-            self.write({'error_message':traceback.format_exc()})
+            self.write({'error_message': traceback.format_exc()})

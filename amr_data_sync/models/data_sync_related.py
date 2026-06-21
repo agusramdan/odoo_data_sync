@@ -4,6 +4,7 @@ import ast
 import json
 import logging
 import traceback
+import datetime
 
 from odoo import api, fields, models, SUPERUSER_ID
 from odoo.tools import date_utils
@@ -61,7 +62,7 @@ class ExternalDataSyncRelated(models.Model):
             'data_json': json.dumps(value)
         })
 
-    def create_many2one(self,name,external_data_sync,value,sync_strategy):
+    def create_many2one(self, name, external_data_sync, value, sync_strategy):
         return self.create({
             'name':name,
             'field_type': 'many2one',
@@ -107,27 +108,23 @@ class ExternalDataSyncRelated(models.Model):
             return
         self.with_context(__process_relation=True, __process_field_after_create=True).process_data()
 
-    def dispatch_process(self,run_immediate=False):
+    def process_with_handel_error(self):
+        try:
+            with self.env.cr.savepoint():
+                self.process_data()
+        except Exception:
+            _logger.exception("Error rec %s", self)
+            self.write_error_safe({
+                'error_info': traceback.format_exc(),
+                'state': 'error',
+                'last_error': fields.Datetime.now(),
+                'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
+            })
+
+    def dispatch_process(self, run_immediate=False):
         self.write({'state': 'process'})
         if run_immediate:
-            id_= self.id
-            with self.pool.cursor() as cr:
-                env = api.Environment(cr, self.env.uid, self.env.context)
-                rec = env[self._name].browse(id_)
-                try:
-                    rec.process_data()
-                    cr.commit()
-                except Exception:
-                    import datetime
-                    _logger.exception("Error rec %s", self)
-                    cr.rollback()
-                    rec = env[self._name].browse(id_)
-                    rec.write_error_safe({
-                        'error_info': traceback.format_exc(),
-                        'state': 'error',
-                        'last_error': fields.Datetime.now(),
-                        'next_processing_datetime': fields.Datetime.now() + datetime.timedelta(hours=1),
-                    })
+            self.process_with_handel_error()
 
     def process_data(self):
         try:
