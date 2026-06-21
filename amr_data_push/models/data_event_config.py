@@ -7,7 +7,7 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
-class InternalDataSync(models.Model):
+class InternalDataEventConfig(models.Model):
     _inherit = 'internal.data.event.config'
     _description = """
     """
@@ -15,7 +15,7 @@ class InternalDataSync(models.Model):
 
     def get_push_fields(self):
         config = self
-        field_names = self.env[self.model_id.model]._fields.keys()
+        field_names = set(self.env[self.model_id.model]._fields)
         if not config:
             return
 

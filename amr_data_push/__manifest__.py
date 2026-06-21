@@ -7,7 +7,7 @@
     "license": "AGPL-3",
     'website': "http://agus.ramdan.tech",
     'category': 'API',
-    'version': '13.0.0.0.1',
+    'version': '13.0.0.0.2',
     'depends': ['base', 'amr_data_event', 'queue_job', 'amr_service_client'],
     # always loaded
     'data': [

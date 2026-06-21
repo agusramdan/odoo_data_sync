@@ -10,7 +10,7 @@ from odoo.tools import date_utils
 _logger = logging.getLogger(__name__)
 
 
-class InternalDataSync(models.Model):
+class InternalDataEvent(models.Model):
     _inherit = 'internal.data.event'
 
     push_payload = fields.Text()
@@ -24,7 +24,6 @@ class InternalDataSync(models.Model):
         company_id = self.company_id
         event_datetime = self.event_datetime
         operation = self.operation
-        config = self.env['internal.data.event.config'].sudo().get_config_write(res_model)
         payload = {
             'name': name,
             'issuer': issuer,
@@ -33,17 +32,23 @@ class InternalDataSync(models.Model):
             'event_datetime': event_datetime,
             'operation': operation,
         }
+        config = self.env['internal.data.event.config'].sudo().get_config_write(res_model)
         if company_id:
             payload['company_id'] = company_id.id
         data = {'id': res_id}
         if operation != 'unlink':
-            data_rec = self.env[res_model].sudo().with_context(__read_data_for_sync_external_application=True,
-                                                               active_test=False).browse(res_id)
-            field_names = config.get_push_fields()
-            data = data_rec.read(fields=field_names)[0]
+            data_rec = self.env[res_model].sudo().with_context(
+                __read_data_for_sync_external_application=True, active_test=False
+            ).browse(res_id)
+
+            if config:
+                field_names = config.get_push_fields()
+                data = data_rec.read(fields=field_names)[0]
+            else:
+                data = data_rec.read()[0]
         payload['data'] = data
         self.write({
-            'audiences': config.audiences,
+            'audiences': config and config.audiences,
             'push_payload': json.dumps(payload, default=date_utils.json_default)
         })
 
@@ -53,7 +58,7 @@ class InternalDataSync(models.Model):
     def action_dispatch_audiences(self):
         self.dispatch_audiences(with_delay=False)
 
-    def dispatch_audiences(self,with_delay=True):
+    def dispatch_audiences(self, with_delay=True):
         self.prepare_payload()
         audiences = self.audiences
         if audiences:
@@ -62,21 +67,22 @@ class InternalDataSync(models.Model):
                 dispatcher = self.with_delay() if with_delay else self
                 dispatcher.dispatch_audience(audience)
         else:
-            _logger.info("Without audiences , %s ",self)
-        self.write({'state':'sent'})
+            _logger.info("Without audiences , %s ", self)
+            self.write({'state': 'sent'})
 
-    def dispatch_audience(self,audience):
-        payload=json.loads(self.push_payload)
+    def dispatch_audience(self, audience):
+        payload = json.loads(self.push_payload)
         res = self.env['service.client'].post(audience, path='/api/v1/data/update', payload=payload)
-        #res = requests.post("https://intra-cni-test8.cerindocorp.id/api/v1/data/update",json=self.push_payload)
+        # res = requests.post("https://intra-cni-test8.cerindocorp.id/api/v1/data/update",json=self.push_payload)
         res.raise_for_status()
-        _logger.info("res %s",res.text)
+        self.write({'state': 'sent'})
+        _logger.info("res %s", res.text)
 
     def send_events(self):
         """
         overide this when using message broker to send external
         """
         for rec in self:
-            if rec.state in ['pending','error']:
-                rec.state='queue'
+            if rec.state in ['pending', 'error']:
+                rec.state = 'queue'
                 rec.with_delay().dispatch_audiences()
