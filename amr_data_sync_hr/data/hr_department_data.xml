@@ -7,7 +7,7 @@
             <field name="external_fields">name,active,parent_id,note,color,company_id,kode,manager_id</field>
             <field name="external_context">{'__read_data_for_sync_external_application':True,'active_test': False}</field>
             <field name="sync_cron" eval="True"/>
-            <field name="exclude_fields">name,active,parent_id,note,color,company_id,manager_id</field>
+            <field name="exclude_fields">color</field>
             <field name="filter_last_update" eval="True"/>
             <field name="internal_model">hr.department</field>
             <field name="strategy">external_push</field>
