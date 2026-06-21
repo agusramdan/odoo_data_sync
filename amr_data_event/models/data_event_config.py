@@ -7,7 +7,7 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
-class InternalDataSync(models.Model):
+class InternalDataEventConfig(models.Model):
     _name = 'internal.data.event.config'
     _description = """
     """
@@ -57,7 +57,6 @@ class InternalDataSync(models.Model):
     def get_config(self, model_name):
         return self.search([('model_id.model', '=', model_name)], limit=1)
 
-
     def get_config_create(self, model_name):
         return self.search([
             ('model_id.model', '=', model_name),
@@ -91,7 +90,7 @@ class InternalDataSync(models.Model):
                 'operation': 'snapshot',
                 'changed_fields': ",".join(changed),
             }
-            if 'company_id' in rec._fields:
-                data['company_id'] = int(rec.company_id)
+            if 'company_id' in rec._fields and rec.company_id:
+                data['company_id'] = rec.company_id.id
             event = AuditEvent.create(data)
             event.send_events()

@@ -108,7 +108,7 @@ class DataEventMixin(models.AbstractModel):
                 'operation': 'create',
                 'changed_fields': "",
             }
-            if 'company_id' in rec._fields:
+            if 'company_id' in rec._fields and rec.company_id:
                 data['company_id'] = rec.company_id.id
             event = AuditEvent.create(data)
             event.send_events()
@@ -171,7 +171,7 @@ class DataEventMixin(models.AbstractModel):
                 'operation': 'write',
                 'changed_fields': ",".join(changed),
             }
-            if 'company_id' in rec._fields:
+            if 'company_id' in rec._fields and rec.company_id:
                 data['company_id'] = rec.company_id.id
             event = AuditEvent.create(data)
             event.send_events()
@@ -202,7 +202,7 @@ class DataEventMixin(models.AbstractModel):
                 'operation': 'unlink',
                 'changed_fields': "",
             }
-            if 'company_id' in rec._fields:
+            if 'company_id' in rec._fields and rec.company_id:
                 data['company_id'] = rec.company_id.id
             event = AuditEvent.create(data)
             event.send_events()

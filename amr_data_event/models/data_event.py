@@ -12,7 +12,7 @@ import logging
 _logger = logging.getLogger(__name__)
 
 
-class InternalDataSync(models.Model):
+class InternalDataEvent(models.Model):
     _name = 'internal.data.event'
     _description = "Internal data event yang akan assess oleh external app"
     name = fields.Char("Display Name")
